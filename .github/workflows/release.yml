@@ -15,16 +15,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build builder image
-        run: docker build -t rpi5-archlinux-builder .
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            arch-install-scripts \
+            dosfstools \
+            e2fsprogs \
+            pacman-package-manager \
+            parted \
+            psmisc \
+            systemd \
+            udev \
+            util-linux \
+            xz-utils
 
       - name: Build Arch Linux image
-        run: |
-          docker run --rm --privileged \
-            -v "$GITHUB_WORKSPACE:/workspace" \
-            -w /workspace \
-            rpi5-archlinux-builder \
-            ./scripts/main.sh
+        run: sudo ./scripts/main.sh
 
       - name: Verify artifacts
         run: |

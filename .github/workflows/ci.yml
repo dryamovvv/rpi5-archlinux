@@ -33,12 +33,3 @@ jobs:
           bash tests/structure_smoke.sh
           bash tests/workflows_smoke.sh
           bash tests/disk_partition_refresh_test.sh
-
-  docker-build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build builder image
-        run: docker build -t rpi5-archlinux-builder .
