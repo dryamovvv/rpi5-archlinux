@@ -30,5 +30,5 @@ git push origin v0.1.0
 ## Container Build Environment
 - `Dockerfile` собирает Arch-based builder image со всеми утилитами, которые нужны текущему build flow.
 - В release workflow сборка идет внутри `docker run --privileged`, потому что скрипт использует `losetup`, `mount`, `mkfs` и `sfdisk`.
-- Для cross-arch setup раннер регистрирует `binfmt`, а `qemu-aarch64-static` используется только на этапе `pacstrap` и удаляется из target rootfs до упаковки образа.
+- Release workflow использует native `arm64` runner `ubuntu-24.04-arm`, поэтому `pacstrap` и post-install hooks выполняются без `qemu-user-static` и `binfmt`.
 - Основная пост-конфигурация вынесена в `systemd-firstboot` и `rpi5-firstboot.service`, чтобы минимизировать build-time `arch-chroot`.

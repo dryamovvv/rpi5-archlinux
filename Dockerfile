@@ -7,7 +7,6 @@ RUN pacman -Syu --noconfirm \
     e2fsprogs \
     parted \
     psmisc \
-    qemu-user-static \
     shellcheck \
     sudo \
     systemd \

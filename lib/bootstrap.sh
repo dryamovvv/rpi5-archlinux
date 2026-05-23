@@ -15,29 +15,6 @@ bootstrap::project_root() {
     cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd
 }
 
-bootstrap::add_qemu() {
-    local target="$1"
-    log::assert_not_empty "$target" "точка монтирования"
-    log::assert_not_empty "$QEMU_BIN" "qemu static"
-    mkdir -p "$target/usr/bin"
-    log::info "Копирую $QEMU_BIN в $target/usr/bin"
-    if cp "$QEMU_BIN" "$target/usr/bin"; then
-        log::success "Успешно скопирован QEMU_BIN в $target/usr/bin"
-    else
-        log::die "Ошибка при копировании QEMU_BIN $target/usr/bin"
-    fi
-}
-
-bootstrap::remove_qemu() {
-    local target="$1"
-    log::assert_not_empty "$target" "точка монтирования"
-
-    if [[ -f "$target/usr/bin/qemu-aarch64-static" ]]; then
-        rm -f "$target/usr/bin/qemu-aarch64-static"
-        log::info "QEMU static удален из target rootfs"
-    fi
-}
-
 # Установка базовых пакетов
 # Аргументы: $1 - точка монтирования
 bootstrap::install_base() {
