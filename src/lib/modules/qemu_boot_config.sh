@@ -7,6 +7,7 @@ readonly _LIB_MODULE_QEMU_BOOT_CONFIG_LOADED=1
 
 qemu_boot_config::register() {
     steps::add "export_qemu_boot" "qemu_boot_config::export_boot_artifacts" "Export kernel and initramfs for QEMU direct boot"
+    steps::add "finalize_qemu_artifacts" "qemu_boot_config::finalize_artifact_permissions" "Make QEMU artifacts readable by the invoking user"
 }
 
 qemu_boot_config::find_first_existing() {
@@ -47,4 +48,9 @@ qemu_boot_config::export_boot_artifacts() {
     cp "$kernel_source" "$BUILD_QEMU_BOOT_DIR/Image"
     cp "$initramfs_source" "$BUILD_QEMU_BOOT_DIR/initramfs-linux.img"
     printf '%s\n' "$BUILD_QEMU_KERNEL_CMDLINE" >"$BUILD_QEMU_BOOT_DIR/cmdline.txt"
+}
+
+qemu_boot_config::finalize_artifact_permissions() {
+    chmod a+r "$BUILD_IMAGE_PATH"
+    chmod a+r "$BUILD_QEMU_BOOT_DIR/Image" "$BUILD_QEMU_BOOT_DIR/initramfs-linux.img" "$BUILD_QEMU_BOOT_DIR/cmdline.txt"
 }

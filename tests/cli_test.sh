@@ -74,6 +74,8 @@ dry_run_output="$("$builder" --dry-run build)"
 qemu_dry_run_output="$("$builder" --dry-run build-qemu)"
 [[ "$qemu_dry_run_output" == *$'export_qemu_boot\tqemu_boot_config::export_boot_artifacts'* ]] ||
     fail "dry-run build-qemu must include qemu boot export step"
+[[ "$qemu_dry_run_output" == *$'finalize_qemu_artifacts\tqemu_boot_config::finalize_artifact_permissions'* ]] ||
+    fail "dry-run build-qemu must include qemu artifact permission finalization"
 [[ "$qemu_dry_run_output" != *$'configure_boot\tboot_config::configure'* ]] ||
     fail "dry-run build-qemu must not use Raspberry Pi boot configuration"
 
