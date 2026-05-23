@@ -11,11 +11,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install validation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            arch-install-scripts \
+            dosfstools \
+            e2fsprogs \
+            pacman-package-manager \
+            parted \
+            psmisc \
+            systemd \
+            udev \
+            util-linux
+
       - name: Validate shell syntax
-        run: bash -n scripts/*.sh lib/*.sh tests/*.sh
+        run: bash -n scripts/*.sh lib/*.sh lib/core/*.sh lib/modules/*.sh tests/*.sh
 
       - name: Run ShellCheck
-        run: shellcheck -x scripts/*.sh lib/*.sh tests/*.sh
+        run: shellcheck -x scripts/*.sh lib/*.sh lib/core/*.sh lib/modules/*.sh tests/*.sh
 
       - name: Validate workflow YAML
         run: |
@@ -34,3 +48,8 @@ jobs:
           bash tests/workflows_smoke.sh
           bash tests/disk_partition_refresh_test.sh
           bash tests/disk_cleanup_test.sh
+          bash tests/steps_registry_test.sh
+          bash tests/boot_validation_test.sh
+          bash tests/config_validation_test.sh
+          bash tests/cli_test.sh
+          ./scripts/main.sh validate

@@ -19,30 +19,32 @@ bootstrap::project_root() {
 # Аргументы: $1 - точка монтирования
 bootstrap::install_base() {
     local target="$1"
+    local pkgs=()
     log::assert_not_empty "$target" "точка монтирования"
 
-    # Список базовых пакетов для первого запуска с донастройкой через first-boot.
-    local pkgs=(
-        "base"
-        "archlinuxarm-keyring"
-        "pacman-mirrorlist"
-        "linux-rpi-16k"
-        "raspberrypi-bootloader"
-        "raspberrypi-utils"
-        "firmware-raspberrypi"
-        "wireless-regdb"
-        "zram-generator"
-        "sudo"
-        "openssh"
-    )
+    if declare -p BUILD_PACKAGES >/dev/null 2>&1; then
+        pkgs=("${BUILD_PACKAGES[@]}")
+    else
+        pkgs=(
+            "base"
+            "archlinuxarm-keyring"
+            "pacman-mirrorlist"
+            "linux-rpi-16k"
+            "raspberrypi-bootloader"
+            "raspberrypi-utils"
+            "firmware-raspberrypi"
+            "wireless-regdb"
+            "zram-generator"
+            "sudo"
+            "openssh"
+        )
+    fi
 
     log::info "Начало установки базовой системы (pacstrap)..."
 
-    # -K сохраняет зеркала, -c предотвращает использование кеша хоста
-    local project_root
-    project_root="$(bootstrap::project_root)"
+    local pacman_conf="${BUILD_PACMAN_CONF:-$(bootstrap::project_root)/conf/pacman-arm.conf}"
 
-    if pacstrap -C "$project_root/conf/pacman-arm.conf" -M -K "$target" "${pkgs[@]}" --noconfirm; then
+    if pacstrap -C "$pacman_conf" -M -K "$target" "${pkgs[@]}" --noconfirm; then
         log::success "Базовая система установлена."
     else
         log::die "Ошибка при работе pacstrap."
@@ -77,8 +79,7 @@ bootstrap::fix_locale_conf() {
     log::assert_not_empty "$target" "точка монтирования"
 
     mkdir -p "$target/etc"
-    if echo "LC_ALL=en_US.UTF-8" >"$target/etc/locale.conf" && echo "LANG=en_US.UTF-8" >> "$target/etc/locale.conf"; then
-        cat  "$target/etc/locale.conf"
+    if echo "LC_ALL=en_US.UTF-8" >"$target/etc/locale.conf" && echo "LANG=en_US.UTF-8" >>"$target/etc/locale.conf"; then
         log::success "Файл $target/etc/locale.conf"
     else
         log::die "Ошибка при обновлении $target/etc/locale.conf"
@@ -181,7 +182,7 @@ bootstrap::cmdline_txt() {
     cat <<EOF >"$target/cmdline.txt"
 root=/dev/mmcblk0p2 rw rootwait console=tty1 fsck.repair=yes nvme.max_host_mem_size_mb=128 cgroup_enable=memory swapaccount=1
 EOF
-    if test -f "$target/cmdline.txt"; then
+    if [[ -s "$target/cmdline.txt" ]]; then
         log::success "$target/cmdline.txt создан!"
     else
         log::die "$target/cmdline.txt не создан!"
@@ -220,7 +221,7 @@ display_auto_detect=0
 
 EOF
 
-    if test "$target/config.txt"; then
+    if [[ -s "$target/config.txt" ]]; then
         log::success "$target/config.txt создан!"
     else
         log::die "$target/config.txt не создан!"
@@ -234,7 +235,7 @@ bootstrap::mkinitcpio_conf() {
     log::assert_not_empty "$target" "точка монтирования"
     log::assert_not_empty "$new_hooks" "новая строка HOOKS"
     log::info "Обновляем $target/etc/mkinitcpio.conf..."
-    sed -i 's/^HOOKS=(.*/HOOKS=(systemd autodetect sd-vconsole modconf keyboard block  filesystems fsck sd-shutdown)/' "$target/etc/mkinitcpio.conf"
+    sed -i "s/^HOOKS=(.*/$new_hooks/" "$target/etc/mkinitcpio.conf"
     sed -i 's/^COMPRESSION="zstd"/#COMPRESSION="zstd"/' "$target/etc/mkinitcpio.conf"
     log::info "Обновлен $target/etc/mkinitcpio.conf..."
 }
@@ -334,7 +335,7 @@ EOF
 }
 
 
-bootstrap::resize_root(){
+bootstrap::resize_root() {
     local target="$1"
     log::assert_not_empty "$target" "точка монтирования"
     log::info "Вызовем репарт при первой загрузке"
@@ -344,4 +345,4 @@ bootstrap::resize_root(){
 Type=root-arm64
 EOF
     bootstrap::systemd_enable_unit "$target" "systemd-growfs-root.service" "multi-user.target.wants"
-} 
+}

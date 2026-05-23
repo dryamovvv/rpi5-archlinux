@@ -25,7 +25,7 @@ grep -q 'runs-on: ubuntu-24.04-arm' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must use the native arm64 runner"
 grep -q 'sudo apt-get install -y' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must install build dependencies on the runner"
-grep -q 'sudo ./scripts/main.sh' "$repo_root/.github/workflows/release.yml" \
+grep -q 'sudo ./scripts/main.sh build' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must run the build script directly on the runner"
 grep -q 'mtools' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must install mtools for boot partition validation"
@@ -41,7 +41,7 @@ fi
 if grep -q 'tonistiigi/binfmt' "$repo_root/.github/workflows/release.yml"; then
     fail "release workflow must not register binfmt on a native arm64 runner"
 fi
-grep -q 'systemd_firstboot' "$repo_root/scripts/main.sh" \
+grep -q 'systemd_firstboot' "$repo_root/lib/modules/services.sh" \
     || fail "main script must use systemd-firstboot"
 grep -q 'arch_root.img.xz' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must publish compressed image"

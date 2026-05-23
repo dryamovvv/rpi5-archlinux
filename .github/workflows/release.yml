@@ -32,7 +32,7 @@ jobs:
             xz-utils
 
       - name: Build Arch Linux image
-        run: sudo ./scripts/main.sh
+        run: sudo ./scripts/main.sh build
 
       - name: Validate boot partition
         run: |

@@ -25,7 +25,7 @@ mount_point="$tmpdir/mnt"
 mkdir -p "$mount_point"
 
 CURRENT_LOOP_DEV="/dev/loop-main"
-PARTITION_LOOP_DEVS=("/dev/loop-boot" "/dev/loop-root")
+PARTITION_LOOP_DEVS=([1]="/dev/loop-boot" [2]="/dev/loop-root")
 
 sync() {
     printf 'sync\n' >>"$calls_file"

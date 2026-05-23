@@ -2,20 +2,26 @@
 Raspberry Pi 5 Arch Linux image build script.
 
 ## Structure
-- `scripts/main.sh` — основной entrypoint сборки.
-- `lib/` — Bash-модули (`disk.sh`, `bootstrap.sh`, `log.sh`).
-- `conf/` — активные статические ресурсы сборки; сейчас в реальном build path используется `pacman-arm.conf`.
+- `scripts/main.sh` — CLI entrypoint сборки.
+- `lib/core/` — CLI/runtime framework: config loading, module loading, step registry, runner, dependency checks.
+- `lib/modules/` — build-модули, которые регистрируют шаги pipeline.
+- `lib/` — низкоуровневые Bash-модули (`disk.sh`, `bootstrap.sh`, `log.sh`).
+- `conf/` — активные статические ресурсы сборки; сейчас в реальном build path используются `build.conf` и `pacman-arm.conf`.
 - `conf/reference/` — шаблоны и reference-файлы, которые не подключены автоматически к текущему build flow.
 
 ## Usage
 ```bash
-sudo ./scripts/main.sh
+./scripts/main.sh help
+./scripts/main.sh list-steps
+./scripts/main.sh validate
+sudo ./scripts/main.sh build
 ```
 
 ## Validation
 ```bash
-bash -n scripts/*.sh lib/*.sh tests/*.sh
-shellcheck scripts/*.sh lib/*.sh tests/*.sh
+bash -n scripts/*.sh lib/*.sh lib/core/*.sh lib/modules/*.sh tests/*.sh
+shellcheck scripts/*.sh lib/*.sh lib/core/*.sh lib/modules/*.sh tests/*.sh
+./scripts/main.sh validate
 ```
 
 ## GitHub Actions

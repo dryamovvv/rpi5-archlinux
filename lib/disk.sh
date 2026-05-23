@@ -1,9 +1,6 @@
 #!/bin/bash
-# lib/template.sh
 
-# 1. Инициализация окружения
-set -e          # Остановить выполнение при любой ошибке
-set -o pipefail # Считать ошибкой сбой в любой части пайпа (A | B)
+set -euo pipefail
 
 # Защита от повторного импорта
 if [[ -n "${_LIB_DISK_LOADED:-}" ]]; then
@@ -17,7 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
 CURRENT_LOOP_DEV=""
 CURRENT_IMAGE_PATH=""
 RESOLVED_PARTITION_PATH=""
-declare -ag PARTITION_LOOP_DEVS=()
+declare -Ag PARTITION_LOOP_DEVS=()
 
 disk::partition_device_path() {
     local loop_dev="$1"
@@ -88,7 +85,7 @@ disk::attach_partition_loop() {
         log::die "Не удалось создать loop-устройство для раздела ${partition_number}"
     fi
 
-    PARTITION_LOOP_DEVS[partition_number]="$partition_loop_dev"
+    PARTITION_LOOP_DEVS[$partition_number]="$partition_loop_dev"
     # shellcheck disable=SC2034
     RESOLVED_PARTITION_PATH="$partition_loop_dev"
     log::info "Создано loop-устройство раздела ${partition_number}: $partition_loop_dev"
@@ -102,18 +99,18 @@ disk::resolve_partition_path() {
     log::assert_not_empty "$loop_dev" "loop device"
     log::assert_not_empty "$partition_number" "partition number"
 
-    part_path="$(disk::partition_device_path "$CURRENT_LOOP_DEV" "$partition_number")"
+    part_path="$(disk::partition_device_path "$loop_dev" "$partition_number")"
     if [[ -e "$part_path" ]]; then
         # shellcheck disable=SC2034
         RESOLVED_PARTITION_PATH="$part_path"
         return 0
     fi
 
-    partprobe "$CURRENT_LOOP_DEV"
-    partx -u "$CURRENT_LOOP_DEV"
+    partprobe "$loop_dev"
+    partx -u "$loop_dev"
     udevadm settle
 
-    part_path="$(disk::partition_device_path "$CURRENT_LOOP_DEV" "$partition_number")"
+    part_path="$(disk::partition_device_path "$loop_dev" "$partition_number")"
     if [[ -e "$part_path" ]]; then
         # shellcheck disable=SC2034
         RESOLVED_PARTITION_PATH="$part_path"
@@ -225,11 +222,10 @@ disk::mount_target() {
         mkdir -p "$target"
     fi
 
-    
     if mount "$source" "$target"; then
         log::info "Смонтирован раздел $source в $target"
     else
-        log::die "Не удалось смонтироваться раздел $part в $target"
+        log::die "Не удалось смонтировать раздел $source в $target"
     fi
 }
 
