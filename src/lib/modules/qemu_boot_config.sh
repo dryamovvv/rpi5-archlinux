@@ -51,6 +51,6 @@ qemu_boot_config::export_boot_artifacts() {
 }
 
 qemu_boot_config::finalize_artifact_permissions() {
-    chmod a+r "$BUILD_IMAGE_PATH"
+    chmod a+rw "$BUILD_IMAGE_PATH"
     chmod a+r "$BUILD_QEMU_BOOT_DIR/Image" "$BUILD_QEMU_BOOT_DIR/initramfs-linux.img" "$BUILD_QEMU_BOOT_DIR/cmdline.txt"
 }

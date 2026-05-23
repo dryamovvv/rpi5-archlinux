@@ -139,7 +139,7 @@ main::require_root() {
     if [[ $EUID -ne 0 ]]; then
         command -v sudo >/dev/null 2>&1 || log::die "Root privileges are required and sudo is not installed"
         log::warn "Root privileges are required for this command. Re-running with sudo..."
-        exec sudo -E "$0" "$@"
+        exec sudo "$0" "$@"
     fi
 }
 
