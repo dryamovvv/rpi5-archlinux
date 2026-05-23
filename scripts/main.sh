@@ -91,14 +91,22 @@ step_partition() {
     disk::partition_simple "${CURRENT_LOOP_DEV}"
 }
 step_create_fs(){
-    local part_boot="${CURRENT_LOOP_DEV}p1"
-    local part_root="${CURRENT_LOOP_DEV}p2"
+    local part_boot
+    local part_root
+    disk::resolve_partition_path "$CURRENT_LOOP_DEV" 1
+    part_boot="$RESOLVED_PARTITION_PATH"
+    disk::resolve_partition_path "$CURRENT_LOOP_DEV" 2
+    part_root="$RESOLVED_PARTITION_PATH"
     disk::format_partition "$part_boot" "vfat"
     disk::format_partition "$part_root" "ext4"
 }
 step_mount_fs(){
-    local part_boot="${CURRENT_LOOP_DEV}p1"
-    local part_root="${CURRENT_LOOP_DEV}p2"
+    local part_boot
+    local part_root
+    disk::resolve_partition_path "$CURRENT_LOOP_DEV" 1
+    part_boot="$RESOLVED_PARTITION_PATH"
+    disk::resolve_partition_path "$CURRENT_LOOP_DEV" 2
+    part_root="$RESOLVED_PARTITION_PATH"
     disk::mount_target "$part_root"  "$MNT_ROOT"
     disk::mount_target "$part_boot"  "$MNT_BOOT"
 }

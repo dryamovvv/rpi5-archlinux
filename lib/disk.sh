@@ -15,6 +15,72 @@ readonly _LIB_DISK_LOADED=1
 source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
 
 CURRENT_LOOP_DEV=""
+CURRENT_IMAGE_PATH=""
+# shellcheck disable=SC2034
+RESOLVED_PARTITION_PATH=""
+
+disk::partition_device_path() {
+    local loop_dev="$1"
+    local partition_number="$2"
+
+    log::assert_not_empty "$loop_dev" "loop device"
+    log::assert_not_empty "$partition_number" "partition number"
+
+    printf '%sp%s\n' "$loop_dev" "$partition_number"
+}
+
+disk::refresh_loop_partitions() {
+    log::assert_not_empty "$CURRENT_LOOP_DEV" "current loop device"
+    log::assert_not_empty "$CURRENT_IMAGE_PATH" "current image path"
+
+    log::warn "Разделы не появились после partprobe, переподключаем loop-устройство..."
+
+    losetup -d "$CURRENT_LOOP_DEV"
+    CURRENT_LOOP_DEV=$(losetup --find -P --show "$CURRENT_IMAGE_PATH")
+
+    if [[ -z "$CURRENT_LOOP_DEV" ]]; then
+        log::die "Не удалось переподключить loop-устройство."
+    fi
+
+    udevadm settle
+    log::info "Loop-устройство переподключено: $CURRENT_LOOP_DEV"
+}
+
+disk::resolve_partition_path() {
+    local loop_dev="$1"
+    local partition_number="$2"
+    local part_path=""
+    local attempt
+
+    log::assert_not_empty "$loop_dev" "loop device"
+    log::assert_not_empty "$partition_number" "partition number"
+
+    for attempt in 1 2; do
+        part_path="$(disk::partition_device_path "$CURRENT_LOOP_DEV" "$partition_number")"
+        if [[ -e "$part_path" ]]; then
+            # shellcheck disable=SC2034
+            RESOLVED_PARTITION_PATH="$part_path"
+            return 0
+        fi
+
+        partprobe "$CURRENT_LOOP_DEV"
+        partx -u "$CURRENT_LOOP_DEV"
+        udevadm settle
+
+        part_path="$(disk::partition_device_path "$CURRENT_LOOP_DEV" "$partition_number")"
+        if [[ -e "$part_path" ]]; then
+            # shellcheck disable=SC2034
+            RESOLVED_PARTITION_PATH="$part_path"
+            return 0
+        fi
+
+        if [[ $attempt -eq 1 ]]; then
+            disk::refresh_loop_partitions
+        fi
+    done
+
+    log::die "Не удалось обнаружить раздел ${partition_number} для $CURRENT_LOOP_DEV"
+}
 
 disk::create_image() {
     local img_path="$1"
@@ -62,6 +128,7 @@ disk::map_loop() {
     log::info "Подключение $img_path к loop-устройства..."
     # -P читает таблицу разделов и создает /dev/loopXp1
     CURRENT_LOOP_DEV=$(losetup --find -P --show "$img_path")
+    CURRENT_IMAGE_PATH="$img_path"
 
     if [[ -z "$CURRENT_LOOP_DEV" ]]; then
         log::die "Не удалось создать loop-устройство."
