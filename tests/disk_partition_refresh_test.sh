@@ -22,7 +22,7 @@ log::assert_not_empty() {
 
 calls_file="$tmpdir/calls.log"
 initial_loop="$tmpdir/loop0"
-remapped_loop="$tmpdir/loop1"
+partition_loop="$tmpdir/loop-part1"
 image_path="$tmpdir/arch_root.img"
 
 touch "$image_path"
@@ -47,34 +47,34 @@ sleep() {
 
 losetup() {
     printf 'losetup %s\n' "$*" >>"$calls_file"
-    if [[ "$1" == "--find" ]]; then
-        touch "${remapped_loop}p1" "${remapped_loop}p2"
-        printf '%s\n' "$remapped_loop"
+    if [[ "$1" == "--find" && "$2" == "--show" && "$3" == "--offset" ]]; then
+        printf '%s\n' "$partition_loop"
         return 0
     fi
 
     return 0
 }
 
+sfdisk() {
+    cat <<EOF
+label: gpt
+${initial_loop}p1 : start=        2048, size=     1048576, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+EOF
+}
+
+blockdev() {
+    printf '512\n'
+}
+
 disk::resolve_partition_path "$CURRENT_LOOP_DEV" 1
 resolved_path="$RESOLVED_PARTITION_PATH"
 
-[[ "$resolved_path" == "${remapped_loop}p1" ]] || {
-    printf 'FAIL: expected remapped partition path, got %s\n' "$resolved_path" >&2
+[[ "$resolved_path" == "$partition_loop" ]] || {
+    printf 'FAIL: expected dedicated partition loop path, got %s\n' "$resolved_path" >&2
     exit 1
 }
 
-[[ "$CURRENT_LOOP_DEV" == "$remapped_loop" ]] || {
-    printf 'FAIL: expected CURRENT_LOOP_DEV to be updated, got %s\n' "$CURRENT_LOOP_DEV" >&2
-    exit 1
-}
-
-grep -q 'losetup -d' "$calls_file" || {
-    printf 'FAIL: expected losetup detach during refresh\n' >&2
-    exit 1
-}
-
-grep -q 'losetup --find -P --show' "$calls_file" || {
-    printf 'FAIL: expected losetup remap during refresh\n' >&2
+grep -q 'losetup --find --show --offset' "$calls_file" || {
+    printf 'FAIL: expected losetup with offset during partition fallback\n' >&2
     exit 1
 }

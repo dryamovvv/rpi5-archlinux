@@ -16,8 +16,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/log.sh"
 
 CURRENT_LOOP_DEV=""
 CURRENT_IMAGE_PATH=""
-# shellcheck disable=SC2034
 RESOLVED_PARTITION_PATH=""
+declare -ag PARTITION_LOOP_DEVS=()
 
 disk::partition_device_path() {
     local loop_dev="$1"
@@ -29,57 +29,99 @@ disk::partition_device_path() {
     printf '%sp%s\n' "$loop_dev" "$partition_number"
 }
 
-disk::refresh_loop_partitions() {
-    log::assert_not_empty "$CURRENT_LOOP_DEV" "current loop device"
-    log::assert_not_empty "$CURRENT_IMAGE_PATH" "current image path"
+disk::partition_layout() {
+    local loop_dev="$1"
+    local partition_number="$2"
+    local partition_line=""
+    local start_sector=""
+    local size_sectors=""
+    local sector_size=""
 
-    log::warn "Разделы не появились после partprobe, переподключаем loop-устройство..."
+    log::assert_not_empty "$loop_dev" "loop device"
+    log::assert_not_empty "$partition_number" "partition number"
 
-    losetup -d "$CURRENT_LOOP_DEV"
-    CURRENT_LOOP_DEV=$(losetup --find -P --show "$CURRENT_IMAGE_PATH")
-
-    if [[ -z "$CURRENT_LOOP_DEV" ]]; then
-        log::die "Не удалось переподключить loop-устройство."
+    partition_line="$(sfdisk --dump "$loop_dev" | grep "^${loop_dev}p${partition_number}[[:space:]]*:")"
+    if [[ -z "$partition_line" ]]; then
+        log::die "Не удалось прочитать разметку для раздела ${partition_number} устройства $loop_dev"
     fi
 
-    udevadm settle
-    log::info "Loop-устройство переподключено: $CURRENT_LOOP_DEV"
+    start_sector="$(sed -E 's/.*start=[[:space:]]*([0-9]+).*/\1/' <<<"$partition_line")"
+    size_sectors="$(sed -E 's/.*size=[[:space:]]*([0-9]+).*/\1/' <<<"$partition_line")"
+    sector_size="$(blockdev --getss "$loop_dev")"
+
+    printf '%s %s %s\n' "$start_sector" "$size_sectors" "$sector_size"
+}
+
+disk::attach_partition_loop() {
+    local partition_number="$1"
+    local start_sector=""
+    local size_sectors=""
+    local sector_size=""
+    local offset_bytes=""
+    local size_bytes=""
+    local partition_loop_dev=""
+    local layout=""
+
+    log::assert_not_empty "$CURRENT_LOOP_DEV" "current loop device"
+    log::assert_not_empty "$CURRENT_IMAGE_PATH" "current image path"
+    log::assert_not_empty "$partition_number" "partition number"
+
+    if [[ -n "${PARTITION_LOOP_DEVS[$partition_number]:-}" ]]; then
+        RESOLVED_PARTITION_PATH="${PARTITION_LOOP_DEVS[$partition_number]}"
+        return 0
+    fi
+
+    layout="$(disk::partition_layout "$CURRENT_LOOP_DEV" "$partition_number")"
+    read -r start_sector size_sectors sector_size <<<"$layout"
+
+    offset_bytes=$((start_sector * sector_size))
+    size_bytes=$((size_sectors * sector_size))
+
+    partition_loop_dev="$(
+        losetup --find --show \
+            --offset "$offset_bytes" \
+            --sizelimit "$size_bytes" \
+            "$CURRENT_IMAGE_PATH"
+    )"
+
+    if [[ -z "$partition_loop_dev" ]]; then
+        log::die "Не удалось создать loop-устройство для раздела ${partition_number}"
+    fi
+
+    PARTITION_LOOP_DEVS[partition_number]="$partition_loop_dev"
+    # shellcheck disable=SC2034
+    RESOLVED_PARTITION_PATH="$partition_loop_dev"
+    log::info "Создано loop-устройство раздела ${partition_number}: $partition_loop_dev"
 }
 
 disk::resolve_partition_path() {
     local loop_dev="$1"
     local partition_number="$2"
     local part_path=""
-    local attempt
 
     log::assert_not_empty "$loop_dev" "loop device"
     log::assert_not_empty "$partition_number" "partition number"
 
-    for attempt in 1 2; do
-        part_path="$(disk::partition_device_path "$CURRENT_LOOP_DEV" "$partition_number")"
-        if [[ -e "$part_path" ]]; then
-            # shellcheck disable=SC2034
-            RESOLVED_PARTITION_PATH="$part_path"
-            return 0
-        fi
+    part_path="$(disk::partition_device_path "$CURRENT_LOOP_DEV" "$partition_number")"
+    if [[ -e "$part_path" ]]; then
+        # shellcheck disable=SC2034
+        RESOLVED_PARTITION_PATH="$part_path"
+        return 0
+    fi
 
-        partprobe "$CURRENT_LOOP_DEV"
-        partx -u "$CURRENT_LOOP_DEV"
-        udevadm settle
+    partprobe "$CURRENT_LOOP_DEV"
+    partx -u "$CURRENT_LOOP_DEV"
+    udevadm settle
 
-        part_path="$(disk::partition_device_path "$CURRENT_LOOP_DEV" "$partition_number")"
-        if [[ -e "$part_path" ]]; then
-            # shellcheck disable=SC2034
-            RESOLVED_PARTITION_PATH="$part_path"
-            return 0
-        fi
+    part_path="$(disk::partition_device_path "$CURRENT_LOOP_DEV" "$partition_number")"
+    if [[ -e "$part_path" ]]; then
+        # shellcheck disable=SC2034
+        RESOLVED_PARTITION_PATH="$part_path"
+        return 0
+    fi
 
-        if [[ $attempt -eq 1 ]]; then
-            disk::refresh_loop_partitions
-        fi
-    done
-
-    log::die "Не удалось обнаружить раздел ${partition_number} для $CURRENT_LOOP_DEV"
+    log::warn "Разделы не появились после partprobe, создаем отдельное loop-устройство для раздела ${partition_number}..."
+    disk::attach_partition_loop "$partition_number"
 }
 
 disk::create_image() {
@@ -227,4 +269,12 @@ disk::cleanup() {
             log::warn "Не удалось освободить $CURRENT_LOOP_DEV (возможно, занято ядром)"
         CURRENT_LOOP_DEV=""
     fi
+
+    for partition_loop_dev in "${PARTITION_LOOP_DEVS[@]:-}"; do
+        if [[ -n "$partition_loop_dev" ]]; then
+            losetup -d "$partition_loop_dev" 2>/dev/null ||
+                log::warn "Не удалось освободить $partition_loop_dev"
+        fi
+    done
+    PARTITION_LOOP_DEVS=()
 }
