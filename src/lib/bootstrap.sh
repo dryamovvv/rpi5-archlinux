@@ -53,6 +53,20 @@ bootstrap::install_base() {
     fi
 }
 
+# Добавляет nofail в опции монтирования /boot в fstab
+# Аргументы: $1 - путь к fstab
+bootstrap::add_nofail_to_boot() {
+    local fstab_path="$1"
+    log::assert_not_empty "$fstab_path" "путь к fstab"
+
+    if [[ ! -f "$fstab_path" ]]; then
+        return
+    fi
+    if grep -qP '^[^#]+\s+/boot\s+' "$fstab_path" 2>/dev/null; then
+        sed -i '/^[^#]\+\s\+\/boot\s\+/ s/\([[:space:]]\+[^[:space:]]\+\)\{2\}$/,nofail&/' "$fstab_path"
+    fi
+}
+
 # Генерация таблицы разделов (fstab)
 # Аргументы: $1 - точка монтирования
 bootstrap::generate_fstab() {
@@ -61,7 +75,9 @@ bootstrap::generate_fstab() {
 
     log::info "Генерация /etc/fstab..."
     # -U использует UUID разделов (стандарт безопасности)
-    genfstab -U "$target" >>"$target/etc/fstab"
+    # Добавляем nofail для /boot, чтобы отсутствие boot-раздела не блокировало загрузку
+    genfstab -U "$target" >"$target/etc/fstab"
+    bootstrap::add_nofail_to_boot "$target/etc/fstab"
     bootstrap::disable_swap "$target"
 }
 
@@ -196,6 +212,7 @@ bootstrap::mkinitcpio_conf() {
     log::assert_not_empty "$new_hooks" "новая строка HOOKS"
     log::info "Обновляем $target/etc/mkinitcpio.conf..."
     sed -i "s/^HOOKS=(.*/$new_hooks/" "$target/etc/mkinitcpio.conf"
+    sed -i 's/^MODULES=(.*/MODULES=(vfat)/' "$target/etc/mkinitcpio.conf"
     sed -i 's/^COMPRESSION="zstd"/#COMPRESSION="zstd"/' "$target/etc/mkinitcpio.conf"
     log::info "Обновлен $target/etc/mkinitcpio.conf..."
 }

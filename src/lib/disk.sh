@@ -340,7 +340,7 @@ disk::shrink_image() {
 
     log::info "Уменьшение файла образа до ${final_image_bytes} байт..."
     truncate -s "$final_image_bytes" "$img_path"
-    sgdisk -e "$img_path" >/dev/null
+    sgdisk -e "$img_path" >/dev/null 2>&1 <<<""
     losetup -c "$loop_dev"
     disk::refresh_partitions "$loop_dev"
 }
