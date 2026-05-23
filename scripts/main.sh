@@ -51,11 +51,9 @@ readonly SSH_USER="$SUDO_USER"
 readonly TIME_ZONE="Europe/Moscow"
 readonly NEW_HOOKS="HOOKS=(base systemd autodetect  modconf kms keyboard keymap sd-vconsole block filesystems fsck)"
 # 2. Перехват прерывания (Ctrl+C) или ошибки
-# Функция cleanup::run должна быть описана в lib/cleanup.sh
-#trap 'cleanup::run' EXIT SIGINT SIGTERM
-# Устанавливаем обработчик сигналов для очистки ресурсов при завершении
-# Это гарантирует, что точка монтирования будет очищена даже при ошибке или прерывании
-# trap 'disk::cleanup "$MNT"' EXIT SIGINT SIGTERM
+# Это гарантирует, что разделы образа будут синхронизированы и размонтированы
+# перед тем, как workflow начнет сжимать arch_root.img.
+trap 'disk::cleanup "$MNT_ROOT"' EXIT SIGINT SIGTERM
 # @function step_prepare
 # @summary Подготовка - создание пустого файла образа
 # @description

@@ -28,10 +28,21 @@ jobs:
             systemd \
             udev \
             util-linux \
+            mtools \
             xz-utils
 
       - name: Build Arch Linux image
         run: sudo ./scripts/main.sh
+
+      - name: Validate boot partition
+        run: |
+          test -f arch_root.img
+          tmp_boot="$(mktemp -d)"
+          trap 'rm -rf "$tmp_boot"' EXIT
+          for path in kernel8.img initramfs-linux.img bcm2712-rpi-5-b.dtb config.txt cmdline.txt; do
+            mcopy -i arch_root.img@@1048576 "::/$path" "$tmp_boot/$path"
+            test -s "$tmp_boot/$path"
+          done
 
       - name: Verify artifacts
         run: |

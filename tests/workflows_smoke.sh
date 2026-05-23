@@ -27,6 +27,14 @@ grep -q 'sudo apt-get install -y' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must install build dependencies on the runner"
 grep -q 'sudo ./scripts/main.sh' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must run the build script directly on the runner"
+grep -q 'mtools' "$repo_root/.github/workflows/release.yml" \
+    || fail "release workflow must install mtools for boot partition validation"
+grep -q 'Validate boot partition' "$repo_root/.github/workflows/release.yml" \
+    || fail "release workflow must validate boot partition contents"
+grep -q 'kernel8.img' "$repo_root/.github/workflows/release.yml" \
+    || fail "release workflow must validate the boot kernel"
+grep -q 'cmdline.txt' "$repo_root/.github/workflows/release.yml" \
+    || fail "release workflow must validate cmdline.txt"
 if grep -q 'docker build\|docker run\|rpi5-archlinux-builder' "$repo_root/.github/workflows/release.yml"; then
     fail "release workflow must not use a custom builder container"
 fi

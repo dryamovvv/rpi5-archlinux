@@ -33,3 +33,4 @@ jobs:
           bash tests/structure_smoke.sh
           bash tests/workflows_smoke.sh
           bash tests/disk_partition_refresh_test.sh
+          bash tests/disk_cleanup_test.sh

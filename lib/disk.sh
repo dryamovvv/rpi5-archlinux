@@ -235,31 +235,38 @@ disk::mount_target() {
 
 disk::cleanup() {
     local mount_point="$1"
+    local partition_loop_dev=""
 
     log::assert_not_empty "$mount_point" "источник монтирования"
 
-    if sync; then
-        log::info "Запись данных на раздел $mount_point заверешна"
-    else
-        log::die "Не удалось завершить запись на раздел $mount_point"
-    fi
+    sync
+    log::info "Запись данных на раздел $mount_point завершена"
 
     if [[ -n "$mount_point" ]] && mountpoint -q "$mount_point"; then
         log::info "Размонтирование $mount_point..."
 
-        # 1. Пытаемся размонтировать рекурсивно
-        # -R размонтирует все вложенные системы (proc, sys, dev)
+        # -R размонтирует вложенные точки, включая boot-раздел.
         if ! umount -R "$mount_point" 2>/dev/null; then
             log::warn "Стандартное размонтирование не удалось, применяем силу..."
             # 2. Убиваем процессы, которые держат папку (требует psmisc / fuser)
-            PID=$(fuser -m "$mount_point" 2>/dev/null)
-            kill "$PID"
+            fuser -km "$mount_point" 2>/dev/null || true
             sleep 1
 
             # 3. Ленивое размонтирование (отключает ФС немедленно, очищает позже)
-            umount -R "$mount_point" 2>/dev/null || true
+            umount -R -l "$mount_point" 2>/dev/null || true
         fi
     fi
+
+    sync
+
+    for partition_loop_dev in "${PARTITION_LOOP_DEVS[@]:-}"; do
+        if [[ -n "$partition_loop_dev" ]]; then
+            log::info "Отключение устройства раздела $partition_loop_dev..."
+            losetup -d "$partition_loop_dev" 2>/dev/null ||
+                log::warn "Не удалось освободить $partition_loop_dev"
+        fi
+    done
+    PARTITION_LOOP_DEVS=()
 
     if [[ -n "$CURRENT_LOOP_DEV" ]]; then
         log::info "Отключение устройства $CURRENT_LOOP_DEV..."
@@ -269,12 +276,4 @@ disk::cleanup() {
             log::warn "Не удалось освободить $CURRENT_LOOP_DEV (возможно, занято ядром)"
         CURRENT_LOOP_DEV=""
     fi
-
-    for partition_loop_dev in "${PARTITION_LOOP_DEVS[@]:-}"; do
-        if [[ -n "$partition_loop_dev" ]]; then
-            losetup -d "$partition_loop_dev" 2>/dev/null ||
-                log::warn "Не удалось освободить $partition_loop_dev"
-        fi
-    done
-    PARTITION_LOOP_DEVS=()
 }
