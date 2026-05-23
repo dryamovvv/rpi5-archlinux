@@ -1,0 +1,12 @@
+[Unit]
+Description=Grow root FS once
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/systemd/systemd-growfs /
+# Эта команда удалит сервис из автозагрузки после успешного выполнения
+ExecStartPost=/usr/bin/systemctl disable grow-once.service
+
+[Install]
+WantedBy=multi-user.target

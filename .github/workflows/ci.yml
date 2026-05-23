@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  shell-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate shell syntax
+        run: bash -n scripts/*.sh lib/*.sh tests/*.sh
+
+      - name: Run ShellCheck
+        run: shellcheck -x scripts/*.sh lib/*.sh tests/*.sh
+
+      - name: Validate workflow YAML
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import yaml
+
+          for path in pathlib.Path(".github/workflows").glob("*.yml"):
+              with path.open("r", encoding="utf-8") as fh:
+                  yaml.safe_load(fh)
+          PY
+
+      - name: Run smoke tests
+        run: |
+          bash tests/structure_smoke.sh
+          bash tests/workflows_smoke.sh
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build builder image
+        run: docker build -t rpi5-archlinux-builder .

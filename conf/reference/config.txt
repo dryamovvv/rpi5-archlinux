@@ -1,0 +1,25 @@
+# For more options and information see 
+# http://rptl.io/configtxt 
+# Some settings may impact device functionality. See link above for details 
+
+[pi5] 
+kernel=kernel8.img 
+auto_initramfs=1 
+initramfs initramfs-linux.img follow-kernel 
+arm_64bit=1 
+arm_boost=1 
+device_tree_address=bcm2712-rpi-5-b.dtb 
+overlay_prefix=overlays/ 
+dtparam=pciex1_gen=3 
+dtoverlay=disable-wifi 
+dtoverlay=disable-bt 
+disable_overscan=1 
+disable_fw_kms_setup=1 
+dtoverlay=vc4-kms-v3d 
+max_framebuffers=2 
+dtparam=audio=on 
+camera_auto_detect=0 
+display_auto_detect=0 
+
+[all] 
+
