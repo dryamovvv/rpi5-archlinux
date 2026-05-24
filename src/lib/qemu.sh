@@ -43,12 +43,12 @@ qemu::command() {
 qemu::run() {
     local command_line=""
 
-    deps::validate_qemu_commands
-
     if ((RUNNER_DRY_RUN)); then
         qemu::command
         return 0
     fi
+
+    deps::validate_qemu_commands
 
     qemu::validate_artifacts
     command_line="$(qemu::command)"

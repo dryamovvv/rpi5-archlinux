@@ -55,12 +55,6 @@ jobs:
                   yaml.safe_load(fh)
           PY
 
-      - name: Debug validate
-        run: |
-          grep -A2 'deps::validate_build_commands()' dist/bin/rpi5-archlinux-image
-          grep -A2 'validate)' dist/bin/rpi5-archlinux-image | head -8
-          ./dist/bin/rpi5-archlinux-image validate
-
       - name: Run smoke tests
         run: |
           bash tests/structure_smoke.sh
@@ -73,3 +67,4 @@ jobs:
           bash tests/boot_validation_test.sh
           bash tests/config_validation_test.sh
           bash tests/cli_test.sh
+          ./dist/bin/rpi5-archlinux-image validate
