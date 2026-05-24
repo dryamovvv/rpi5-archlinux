@@ -21,8 +21,6 @@ grep -q '"v\*"' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must target v* tags"
 grep -q 'workflow_dispatch:' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must support manual runs"
-grep -q 'include_qemu:' "$repo_root/.github/workflows/release.yml" \
-    || fail "release workflow must expose a manual QEMU build input"
 grep -q 'gh release create' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must publish a GitHub release"
 grep -q 'runs-on: ubuntu-24.04-arm' "$repo_root/.github/workflows/release.yml" \
@@ -64,12 +62,7 @@ if grep -q 'tonistiigi/binfmt' "$repo_root/.github/workflows/release.yml"; then
 fi
 grep -q 'systemd_firstboot' "$repo_root/src/lib/modules/services.sh" \
     || fail "main script must use systemd-firstboot"
-grep -Fq "archlinuxarm-rpi5-aarch64-\${GITHUB_REF_NAME}.img.xz" "$repo_root/.github/workflows/release.yml" \
+grep -Fq "archlinux-rpi5-aarch64-\${GITHUB_REF_NAME}.img.xz" "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must publish tagged compressed image"
-grep -q 'github.event_name == '\''workflow_dispatch'\'' && inputs.include_qemu' "$repo_root/.github/workflows/release.yml" \
-    || fail "release workflow must build QEMU image only for manual runs with include_qemu"
-grep -q 'dist/images/archlinuxarm-rpi5-aarch64.img' "$repo_root/.github/workflows/release.yml" \
+grep -q 'dist/images/archlinux-rpi5-aarch64.img' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must read the image from dist/images"
-if ! grep -B3 './dist/bin/rpi5-archlinux-image build-qemu' "$repo_root/.github/workflows/release.yml" | grep -q 'inputs.include_qemu'; then
-    fail "release workflow must not build QEMU image on tag releases"
-fi

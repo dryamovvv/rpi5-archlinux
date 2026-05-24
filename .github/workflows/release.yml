@@ -5,13 +5,6 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
-    inputs:
-      include_qemu:
-        description: "Build and publish the QEMU image"
-        required: false
-        default: false
-        type: boolean
-
 permissions:
   contents: write
 
@@ -27,6 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             arch-install-scripts \
+            aria2 \
             dosfstools \
             e2fsprogs \
             pacman-package-manager \
@@ -36,7 +30,6 @@ jobs:
             udev \
             util-linux \
             mtools \
-            qemu-system-arm \
             xz-utils
 
       - name: Package builder
@@ -47,70 +40,35 @@ jobs:
       - name: Build Arch Linux image
         run: ./dist/bin/rpi5-archlinux-image build
 
-      - name: Build QEMU image
-        if: github.event_name == 'workflow_dispatch' && inputs.include_qemu
-        run: ./dist/bin/rpi5-archlinux-image build-qemu
-
       - name: Validate boot partition
         run: |
-          test -f dist/images/archlinuxarm-rpi5-aarch64.img
+          test -f dist/images/archlinux-rpi5-aarch64.img
           tmp_boot="$(mktemp -d)"
           trap 'rm -rf "$tmp_boot"' EXIT
           for path in kernel8.img initramfs-linux.img bcm2712-rpi-5-b.dtb config.txt cmdline.txt; do
-            mcopy -i dist/images/archlinuxarm-rpi5-aarch64.img@@1048576 "::/$path" "$tmp_boot/$path"
+            mcopy -i dist/images/archlinux-rpi5-aarch64.img@@1048576 "::/$path" "$tmp_boot/$path"
             test -s "$tmp_boot/$path"
           done
 
-      - name: Verify QEMU boot starts
-        if: github.event_name == 'workflow_dispatch' && inputs.include_qemu
-        run: |
-          set +e
-          timeout 60 ./dist/bin/rpi5-archlinux-image qemu-run > qemu-boot.log 2>&1
-          rc="$?"
-          set -e
-          if [[ "$rc" -ne 0 && "$rc" -ne 124 ]]; then
-            cat qemu-boot.log
-            exit "$rc"
-          fi
-          grep -E 'Linux version|Booting Linux|Run /init|Starting systemd|Welcome to Arch Linux' qemu-boot.log
-
       - name: Verify artifacts
         run: |
-          image_name="archlinuxarm-rpi5-aarch64-${GITHUB_REF_NAME}.img.xz"
+          image_name="archlinux-rpi5-aarch64-${GITHUB_REF_NAME}.img.xz"
           checksum_name="${image_name}.sha256"
-          test -f dist/images/archlinuxarm-rpi5-aarch64.img
-          xz -T0 -9 -c dist/images/archlinuxarm-rpi5-aarch64.img > "dist/images/${image_name}"
+          test -f dist/images/archlinux-rpi5-aarch64.img
+          xz -T0 -9 -c dist/images/archlinux-rpi5-aarch64.img > "dist/images/${image_name}"
           test -f "dist/images/${image_name}"
           sha256sum "dist/images/${image_name}" > "dist/images/${checksum_name}"
-
-          if [[ "${{ github.event_name == 'workflow_dispatch' && inputs.include_qemu }}" == "true" ]]; then
-            qemu_image_name="archlinuxarm-qemu-aarch64-${GITHUB_REF_NAME}.img.xz"
-            qemu_checksum_name="${qemu_image_name}.sha256"
-            test -f dist/images/archlinuxarm-qemu-aarch64.img
-            xz -T0 -9 -c dist/images/archlinuxarm-qemu-aarch64.img > "dist/images/${qemu_image_name}"
-            test -f "dist/images/${qemu_image_name}"
-            sha256sum "dist/images/${qemu_image_name}" > "dist/images/${qemu_checksum_name}"
-          fi
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          image_name="archlinuxarm-rpi5-aarch64-${GITHUB_REF_NAME}.img.xz"
+          image_name="archlinux-rpi5-aarch64-${GITHUB_REF_NAME}.img.xz"
           checksum_name="${image_name}.sha256"
           release_assets=(
             "dist/images/${image_name}"
             "dist/images/${checksum_name}"
           )
-
-          if [[ "${{ github.event_name == 'workflow_dispatch' && inputs.include_qemu }}" == "true" ]]; then
-            qemu_image_name="archlinuxarm-qemu-aarch64-${GITHUB_REF_NAME}.img.xz"
-            qemu_checksum_name="${qemu_image_name}.sha256"
-            release_assets+=(
-              "dist/images/${qemu_image_name}"
-              "dist/images/${qemu_checksum_name}"
-            )
-          fi
 
           gh release create "$GITHUB_REF_NAME" \
             "${release_assets[@]}" \

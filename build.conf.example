@@ -2,13 +2,13 @@
 
 # Example build configuration for src/main.sh and dist/bin/rpi5-archlinux-image.
 
-BUILD_IMAGE_PATH="$BUILD_PROJECT_ROOT/dist/images/archlinuxarm-rpi5-aarch64.img"
+BUILD_IMAGE_PATH="$BUILD_PROJECT_ROOT/dist/images/archlinux-rpi5-aarch64.img"
 BUILD_IMAGE_SIZE="4g"
 BUILD_IMAGE_SHRINK_MARGIN="256M"
 BUILD_MOUNT_ROOT="/mnt/arch_build"
 BUILD_MOUNT_BOOT="$BUILD_MOUNT_ROOT/boot"
 
-BUILD_QEMU_IMAGE_PATH="$BUILD_PROJECT_ROOT/dist/images/archlinuxarm-qemu-aarch64.img"
+BUILD_QEMU_IMAGE_PATH="$BUILD_PROJECT_ROOT/dist/images/archlinux-qemu-aarch64.img"
 BUILD_QEMU_BOOT_DIR="$BUILD_PROJECT_ROOT/dist/images/qemu-boot"
 BUILD_QEMU_MOUNT_ROOT="/mnt/arch_qemu_build"
 BUILD_QEMU_CPU="cortex-a72"

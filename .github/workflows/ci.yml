@@ -16,6 +16,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             arch-install-scripts \
+            aria2 \
             dosfstools \
             e2fsprogs \
             pacman-package-manager \

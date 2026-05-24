@@ -20,7 +20,7 @@ fail() {
 
 set_valid_config() {
     BUILD_PACMAN_CONF="$repo_root/src/conf/pacman/pacman-arm.conf"
-    BUILD_IMAGE_PATH="$repo_root/dist/images/archlinuxarm-rpi5-aarch64.img"
+    BUILD_IMAGE_PATH="$repo_root/dist/images/archlinux-rpi5-aarch64.img"
     BUILD_IMAGE_SIZE="4g"
     BUILD_IMAGE_SHRINK_MARGIN="256M"
     BUILD_MOUNT_ROOT="/mnt/arch_build"
@@ -29,6 +29,7 @@ set_valid_config() {
     BUILD_USER_PASSWORD="dryam"
     BUILD_SSH_USER="$BUILD_USER_NAME"
     BUILD_ROOT_PASSWORD="root"
+    BUILD_HOSTNAME="arch-rpi5"
     BUILD_TIMEZONE="Europe/Moscow"
     BUILD_MKINITCPIO_HOOKS="HOOKS=(base systemd filesystems fsck)"
     BUILD_MODULES=("disk_image")

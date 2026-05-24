@@ -21,6 +21,7 @@ deps::require_commands() {
 
 deps::validate_build_commands() {
     deps::require_commands \
+        aria2c \
         blockdev \
         dumpe2fs \
         e2fsck \

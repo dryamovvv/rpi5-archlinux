@@ -29,7 +29,7 @@ config::load_default() {
 }
 
 config::select_qemu() {
-    BUILD_IMAGE_PATH="${BUILD_QEMU_IMAGE_PATH:-$BUILD_PROJECT_ROOT/dist/images/archlinuxarm-qemu-aarch64.img}"
+    BUILD_IMAGE_PATH="${BUILD_QEMU_IMAGE_PATH:-$BUILD_PROJECT_ROOT/dist/images/archlinux-qemu-aarch64.img}"
     BUILD_MOUNT_ROOT="${BUILD_QEMU_MOUNT_ROOT:-/mnt/arch_qemu_build}"
     BUILD_MOUNT_BOOT="$BUILD_MOUNT_ROOT/boot"
     BUILD_MKINITCPIO_HOOKS="${BUILD_QEMU_MKINITCPIO_HOOKS:-$BUILD_MKINITCPIO_HOOKS}"
@@ -69,18 +69,18 @@ config::validate() {
     BUILD_IMAGE_SHRINK_MARGIN="${BUILD_IMAGE_SHRINK_MARGIN:-256M}"
 
     local required_values=(
-        "$BUILD_IMAGE_PATH"
-        "$BUILD_IMAGE_SIZE"
-        "$BUILD_IMAGE_SHRINK_MARGIN"
-        "$BUILD_MOUNT_ROOT"
-        "$BUILD_MOUNT_BOOT"
-        "$BUILD_USER_NAME"
-        "$BUILD_USER_PASSWORD"
-        "$BUILD_SSH_USER"
-        "$BUILD_ROOT_PASSWORD"
-        "$BUILD_HOSTNAME"
-        "$BUILD_TIMEZONE"
-        "$BUILD_MKINITCPIO_HOOKS"
+        "${BUILD_IMAGE_PATH:-}"
+        "${BUILD_IMAGE_SIZE:-}"
+        "${BUILD_IMAGE_SHRINK_MARGIN:-}"
+        "${BUILD_MOUNT_ROOT:-}"
+        "${BUILD_MOUNT_BOOT:-}"
+        "${BUILD_USER_NAME:-}"
+        "${BUILD_USER_PASSWORD:-}"
+        "${BUILD_SSH_USER:-}"
+        "${BUILD_ROOT_PASSWORD:-}"
+        "${BUILD_HOSTNAME:-}"
+        "${BUILD_TIMEZONE:-}"
+        "${BUILD_MKINITCPIO_HOOKS:-}"
     )
     local value=""
 

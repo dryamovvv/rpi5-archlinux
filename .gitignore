@@ -1,8 +1,8 @@
 build.conf
-archlinuxarm-rpi5-aarch64.img
-archlinuxarm-rpi5-aarch64-*.img.xz
-archlinuxarm-rpi5-aarch64-*.img.xz.sha256
-archlinuxarm-qemu-aarch64.img
-archlinuxarm-qemu-aarch64-*.img.xz
-archlinuxarm-qemu-aarch64-*.img.xz.sha256
+archlinux-rpi5-aarch64.img
+archlinux-rpi5-aarch64-*.img.xz
+archlinux-rpi5-aarch64-*.img.xz.sha256
+archlinux-qemu-aarch64.img
+archlinux-qemu-aarch64-*.img.xz
+archlinux-qemu-aarch64-*.img.xz.sha256
 dist/
