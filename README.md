@@ -8,7 +8,7 @@ Raspberry Pi 5 Arch Linux image build script.
 - `src/lib/` — низкоуровневые Bash-модули (`disk.sh`, `bootstrap.sh`, `log.sh`).
 - `scripts/package.sh` — собирает один исполняемый файл в `dist/bin/` и создает `dist/images/`.
 - `dist/bin/rpi5-archlinux-image` — generated packaged CLI для запуска сборки образа.
-- `dist/images/` — generated каталог для локальных `archlinux-rpi5-aarch64.img` и `archlinux-qemu-aarch64.img`, boot-файлов QEMU в `qemu-boot/` и release artifacts вида `archlinux-rpi5-aarch64-${TAG}.img.xz` / `archlinux-qemu-aarch64-${TAG}.img.xz`; каталог `dist/` не коммитится.
+- `dist/images/` — generated каталог для локальных `archlinux-rpi5-aarch64.img` и `archlinux-rpi5-aarch64.img.xz`; каталог `dist/` не коммитится.
 - `build.conf.example` — шаблон build-конфигурации.
 - `build.conf` — локальный ignored config; `scripts/package.sh` требует этот файл и embedded-встраивает его значения в `dist/bin/rpi5-archlinux-image` как default config.
 - `src/conf/pacman/` — active pacman-конфигурация, embedded в packaged builder и реально используемая `pacstrap`.
@@ -49,7 +49,7 @@ shellcheck scripts/*.sh src/main.sh src/lib/*.sh src/lib/core/*.sh src/lib/modul
 
 ## GitHub Actions
 - `.github/workflows/ci.yml` проверяет shell-скрипты и smoke-тесты.
-- `.github/workflows/release.yml` запускается на тегах `v*`, собирает Raspberry Pi образ на native `arm64` runner и публикует `archlinux-rpi5-aarch64-${TAG}.img.xz` с `.sha256`. QEMU образ публикуется только при ручном запуске workflow с `include_qemu=true`.
+- `.github/workflows/release.yml` запускается на тегах `v*`, собирает Raspberry Pi образ на native `arm64` runner и публикует `archlinux-rpi5-aarch64.img.xz` с `.sha256`.
 - Локальный сценарий релиза:
 ```bash
 git tag v0.1.0

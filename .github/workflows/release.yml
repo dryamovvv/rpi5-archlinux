@@ -52,7 +52,7 @@ jobs:
 
       - name: Verify artifacts
         run: |
-          image_name="archlinux-rpi5-aarch64-${GITHUB_REF_NAME}.img.xz"
+          image_name="archlinux-rpi5-aarch64.img.xz"
           checksum_name="${image_name}.sha256"
           test -f dist/images/archlinux-rpi5-aarch64.img
           xz -T0 -9 -c dist/images/archlinux-rpi5-aarch64.img > "dist/images/${image_name}"
@@ -63,7 +63,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          image_name="archlinux-rpi5-aarch64-${GITHUB_REF_NAME}.img.xz"
+          image_name="archlinux-rpi5-aarch64.img.xz"
           checksum_name="${image_name}.sha256"
           release_assets=(
             "dist/images/${image_name}"

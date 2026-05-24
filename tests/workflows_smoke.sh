@@ -62,7 +62,7 @@ if grep -q 'tonistiigi/binfmt' "$repo_root/.github/workflows/release.yml"; then
 fi
 grep -q 'systemd_firstboot' "$repo_root/src/lib/modules/services.sh" \
     || fail "main script must use systemd-firstboot"
-grep -Fq "archlinux-rpi5-aarch64-\${GITHUB_REF_NAME}.img.xz" "$repo_root/.github/workflows/release.yml" \
-    || fail "release workflow must publish tagged compressed image"
+grep -Fq 'archlinux-rpi5-aarch64.img.xz' "$repo_root/.github/workflows/release.yml" \
+    || fail "release workflow must publish compressed image"
 grep -q 'dist/images/archlinux-rpi5-aarch64.img' "$repo_root/.github/workflows/release.yml" \
     || fail "release workflow must read the image from dist/images"
