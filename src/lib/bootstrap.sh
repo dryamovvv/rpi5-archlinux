@@ -247,6 +247,10 @@ bootstrap::mkinitcpio_conf() {
     sed -i "s/^HOOKS=(.*/$new_hooks/" "$target/etc/mkinitcpio.conf"
     sed -i 's/^MODULES=(.*/MODULES=(vfat)/' "$target/etc/mkinitcpio.conf"
     sed -i 's/^COMPRESSION="zstd"/#COMPRESSION="zstd"/' "$target/etc/mkinitcpio.conf"
+    if [[ -n "${BUILD_MKINITCPIO_COMPRESSION:-}" ]]; then
+        sed -i "s/^#COMPRESSION=.*/COMPRESSION="$BUILD_MKINITCPIO_COMPRESSION"/" "$target/etc/mkinitcpio.conf"
+        log::info "mkinitcpio compression: $BUILD_MKINITCPIO_COMPRESSION"
+    fi
     log::info "Обновлен $target/etc/mkinitcpio.conf..."
 }
 
@@ -270,6 +274,12 @@ Name=en*
 
 [Network]
 DHCP=yes
+MulticastDNS=yes
+EOF
+    mkdir -p "$target/etc/systemd"
+    cat <<'EOF' >"$target/etc/systemd/resolved.conf"
+[Resolve]
+MulticastDNS=yes
 EOF
     ln -sf /run/systemd/resolve/stub-resolv.conf "$target/etc/resolv.conf"
     bootstrap::systemd_enable_unit "$target" "systemd-networkd.service" "multi-user.target.wants"
@@ -292,6 +302,7 @@ bootstrap::sshd() {
 
     log::info "Настраиваем sshd"
     echo "AllowUsers $ssh_user" >>"$target/etc/ssh/sshd_config"
+    echo "PermitRootLogin no" >>"$target/etc/ssh/sshd_config"
     bootstrap::systemd_enable_unit "$target" "sshd.service" "multi-user.target.wants"
 }
 
@@ -311,10 +322,12 @@ bootstrap::cpu_boost() {
     local target="$1"
     log::assert_not_empty "$target" "точка монтирования"
 
-    log::info "Настраиваем активацию CPU Boost при загрузке..."
+    log::info "Настраиваем CPU Boost и schedutil governor..."
     mkdir -p "$target/etc/tmpfiles.d"
-    cat <<'EOF' >"$target/etc/tmpfiles.d/cpu-boost.conf"
+    cat <<'EOF' >"$target/etc/tmpfiles.d/cpu-power.conf"
 w /sys/devices/system/cpu/cpufreq/boost - - - - 1
+w /sys/devices/system/cpu/cpufreq/policy0/scaling_governor - - - - schedutil
+w /sys/devices/system/cpu/cpufreq/policy4/scaling_governor - - - - schedutil
 EOF
 }
 

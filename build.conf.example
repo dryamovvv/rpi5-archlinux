@@ -25,6 +25,14 @@ BUILD_SSH_USER="$BUILD_USER_NAME"
 BUILD_ROOT_PASSWORD="root"
 BUILD_TIMEZONE="Europe/Moscow"
 BUILD_MKINITCPIO_HOOKS="HOOKS=(base systemd autodetect modconf kms keyboard keymap sd-vconsole block filesystems fsck)"
+# Initramfs compression: "gzip" (default), "cat" (faster dev builds, no compression)
+BUILD_MKINITCPIO_COMPRESSION="gzip"
+# Image shrink after build: 1=shrink (default), 0=skip (faster dev builds)
+BUILD_SHRINK_IMAGE=1
+# ZRAM compression: 0=disabled, 1=enabled via systemd-zram-generator
+BUILD_ENABLE_ZRAM=0
+# Wi-Fi support: 0=disabled, 1=enable wpa_supplicant and remove disable-wifi overlay
+BUILD_ENABLE_WIFI=0
 
 BUILD_MODULES=(
     "disk_image"
