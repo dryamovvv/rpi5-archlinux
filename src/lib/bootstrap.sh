@@ -19,21 +19,36 @@ bootstrap::install_base() {
     log::assert_not_empty "$target" "точка монтирования"
 
     if declare -p BUILD_PACKAGES >/dev/null 2>&1; then
-        pkgs=("${BUILD_PACKAGES[@]}")
+      pkgs=("${BUILD_PACKAGES[@]}")
     else
-        pkgs=(
-            "base"
-            "archlinuxarm-keyring"
-            "pacman-mirrorlist"
-            "linux-rpi-16k"
-            "raspberrypi-bootloader"
-            "raspberrypi-utils"
-            "firmware-raspberrypi"
-            "linux-firmware"
-            "wireless-regdb"
-            "sudo"
-            "openssh"
-        )
+      pkgs=(
+        "base"
+        "archlinuxarm-keyring"
+        "pacman-mirrorlist"
+        "linux-rpi-16k"
+        "raspberrypi-bootloader"
+        "raspberrypi-utils"
+        "firmware-raspberrypi"
+        "linux-firmware"
+        "wireless-regdb"
+        "sudo"
+        "openssh"
+        "git"
+        "vim"
+        "htop"
+        "tmux"
+        "bash-completion"
+        "man-db"
+        "man-pages"
+        "logrotate"
+        "i2c-tools"
+        "cpupower"
+        "rng-tools"
+        "iptables-nft"
+        "fail2ban"
+        "wpa_supplicant"
+        "avahi"
+      )
     fi
 
     log::info "Начало установки базовой системы (pacstrap)..."
@@ -41,15 +56,15 @@ bootstrap::install_base() {
     local pacman_conf=""
 
     if [[ -n "${BUILD_PACMAN_CONF:-}" && -f "$BUILD_PACMAN_CONF" ]]; then
-        pacman_conf="$BUILD_PACMAN_CONF"
+      pacman_conf="$BUILD_PACMAN_CONF"
     else
-        pacman_conf="$(assets::materialize "pacman/pacman-arm.conf")"
+      pacman_conf="$(assets::materialize "pacman/pacman-arm.conf")"
     fi
 
     if pacstrap -C "$pacman_conf" -M -K "$target" "${pkgs[@]}" --noconfirm; then
-        log::success "Базовая система установлена."
+      log::success "Базовая система установлена."
     else
-        log::die "Ошибка при работе pacstrap."
+      log::die "Ошибка при работе pacstrap."
     fi
 }
 
@@ -60,10 +75,10 @@ bootstrap::add_nofail_to_boot() {
     log::assert_not_empty "$fstab_path" "путь к fstab"
 
     if [[ ! -f "$fstab_path" ]]; then
-        return
+      return
     fi
     if grep -qP '^[^#]+\s+/boot\s+' "$fstab_path" 2>/dev/null; then
-        sed -i '/^[^#]\+\s\+\/boot\s\+/ s/\([[:space:]]\+[^[:space:]]\+\)\{2\}$/,nofail&/' "$fstab_path"
+      sed -i '/^[^#]\+\s\+\/boot\s\+/ s/\([[:space:]]\+[^[:space:]]\+\)\{2\}$/,nofail&/' "$fstab_path"
     fi
 }
 
@@ -87,9 +102,9 @@ bootstrap::fix_vconsole() {
 
     mkdir -p "$target/etc"
     if echo "XKBLAYOUT=us" >"$target/etc/vconsole.conf"; then
-        log::success "Файл $target/etc/vconsole.conf обновлен"
+      log::success "Файл $target/etc/vconsole.conf обновлен"
     else
-        log::die "Ошибка при обновлении $target/etc/vconsole.conf"
+      log::die "Ошибка при обновлении $target/etc/vconsole.conf"
     fi
 }
 
@@ -99,7 +114,7 @@ bootstrap::locale_gen_file() {
 
     mkdir -p "$target/etc"
     if ! grep -q '^en_US.UTF-8 UTF-8$' "$target/etc/locale.gen" 2>/dev/null; then
-        echo "en_US.UTF-8 UTF-8" >>"$target/etc/locale.gen"
+      echo "en_US.UTF-8 UTF-8" >>"$target/etc/locale.gen"
     fi
 }
 
@@ -143,15 +158,15 @@ bootstrap::systemd_firstboot() {
 
     log::info "Применяем systemd-firstboot..."
     systemd-firstboot \
-        --root="$target" \
-        --force \
-        --locale=en_US.UTF-8 \
-        --keymap=us \
-        --timezone="$timezone" \
-        --hostname="$hostname" \
-        --root-password="$root_password" \
-        --root-shell=/bin/bash \
-        --setup-machine-id
+      --root="$target" \
+      --force \
+      --locale=en_US.UTF-8 \
+      --keymap=us \
+      --timezone="$timezone" \
+      --hostname="$hostname" \
+      --root-password="$root_password" \
+      --root-shell=/bin/bash \
+      --setup-machine-id
 }
 
 bootstrap::firstboot_service() {
@@ -167,15 +182,15 @@ bootstrap::firstboot_service() {
 set -euo pipefail
 
 if ! id -u "$user_name" >/dev/null 2>&1; then
-    useradd -m -G wheel "$user_name"
-    # No preset password — user must change on first login
-    chage -d 0 "$user_name"
+      useradd -m -G wheel "$user_name"
+      # No preset password — user must change on first login
+      chage -d 0 "$user_name"
 fi
 
 locale-gen >/dev/null
 
 if command -v systemd-repart >/dev/null 2>&1; then
-    systemd-repart --dry-run=no
+      systemd-repart --dry-run=no
 fi
 systemctl restart systemd-growfs-root.service || true
 FIRSTBOOTSCRIPT
@@ -196,16 +211,16 @@ bootstrap::cmdline_txt() {
     assets::write "boot/cmdline.txt" "$target/cmdline.txt"
 
     if [[ -n "${BUILD_ROOT_UUID:-}" ]]; then
-        sed -i "s/__ROOT_UUID__/$BUILD_ROOT_UUID/" "$target/cmdline.txt"
-        log::info "cmdline.txt: root=UUID=$BUILD_ROOT_UUID"
+      sed -i "s/__ROOT_UUID__/$BUILD_ROOT_UUID/" "$target/cmdline.txt"
+      log::info "cmdline.txt: root=UUID=$BUILD_ROOT_UUID"
     else
-        log::warn "BUILD_ROOT_UUID не задан — cmdline.txt содержит плейсхолдер __ROOT_UUID__"
+      log::warn "BUILD_ROOT_UUID не задан — cmdline.txt содержит плейсхолдер __ROOT_UUID__"
     fi
 
     if [[ -s "$target/cmdline.txt" ]]; then
-        log::success "$target/cmdline.txt создан!"
+      log::success "$target/cmdline.txt создан!"
     else
-        log::die "$target/cmdline.txt не создан!"
+      log::die "$target/cmdline.txt не создан!"
     fi
 }
 
@@ -216,9 +231,9 @@ bootstrap::config_txt() {
     assets::write "boot/config.txt" "$target/config.txt"
 
     if [[ -s "$target/config.txt" ]]; then
-        log::success "$target/config.txt создан!"
+      log::success "$target/config.txt создан!"
     else
-        log::die "$target/config.txt не создан!"
+      log::die "$target/config.txt не создан!"
     fi
 
 }
@@ -288,7 +303,7 @@ bootstrap::disable_swap() {
     rm -f "$target/etc/systemd/zram-generator.conf"
     rm -rf "$target/swap"
     if [[ -f "$target/etc/fstab" ]]; then
-        sed -i -E '/[[:space:]]swap[[:space:]]/d' "$target/etc/fstab"
+      sed -i -E '/[[:space:]]swap[[:space:]]/d' "$target/etc/fstab"
     fi
 }
 
@@ -314,7 +329,6 @@ bootstrap::wifi_regdom() {
 WIRELESS_REGDOM="RU"
 EOF
 }
-
 
 bootstrap::resize_root() {
     local target="$1"

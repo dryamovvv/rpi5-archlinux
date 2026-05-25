@@ -47,6 +47,24 @@ BUILD_PACKAGES=(
     "wireless-regdb"
     "sudo"
     "openssh"
+    # Quality-of-life
+    "git"
+    "vim"
+    "htop"
+    "tmux"
+    "bash-completion"
+    "man-db"
+    "man-pages"
+    "logrotate"
+    # Hardware
+    "i2c-tools"
+    "cpupower"
+    "rng-tools"
+    # Network & security
+    "iptables-nft"
+    "fail2ban"
+    "wpa_supplicant"
+    "avahi"
 )
 
 BUILD_QEMU_MODULES=(
@@ -64,4 +82,22 @@ BUILD_QEMU_PACKAGES=(
     "linux-aarch64"
     "sudo"
     "openssh"
+    # Quality-of-life
+    "git"
+    "vim"
+    "htop"
+    "tmux"
+    "bash-completion"
+    "man-db"
+    "man-pages"
+    "logrotate"
+    # Hardware
+    "i2c-tools"
+    "cpupower"
+    "rng-tools"
+    # Network & security
+    "iptables-nft"
+    "fail2ban"
+    "wpa_supplicant"
+    "avahi"
 )
