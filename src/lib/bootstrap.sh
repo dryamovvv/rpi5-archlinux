@@ -116,6 +116,20 @@ bootstrap::systemd_enable_unit() {
     ln -sf "/usr/lib/systemd/system/$unit" "$target/etc/systemd/system/$wants_dir/$unit"
 }
 
+# Enable a custom unit stored in /etc/systemd/system/ (not /usr/lib/systemd/system/)
+bootstrap::systemd_enable_custom_unit() {
+    local target="$1"
+    local unit="$2"
+    local wants_dir="$3"
+
+    log::assert_not_empty "$target" "точка монтирования"
+    log::assert_not_empty "$unit" "systemd unit"
+    log::assert_not_empty "$wants_dir" "wants dir"
+
+    mkdir -p "$target/etc/systemd/system/$wants_dir"
+    ln -sf "/etc/systemd/system/$unit" "$target/etc/systemd/system/$wants_dir/$unit"
+}
+
 bootstrap::systemd_firstboot() {
     local target="$1"
     local timezone="$2"
@@ -155,14 +169,14 @@ bootstrap::firstboot_service() {
 set -euo pipefail
 
 if ! id -u "$user_name" >/dev/null 2>&1; then
-        useradd -m -G wheel "$user_name"
+            useradd -m -G wheel "$user_name"
 fi
 
 echo "$user_name:$user_password" | chpasswd
 chage -d 0 "$user_name"
 locale-gen >/dev/null
 if command -v systemd-repart >/dev/null 2>&1; then
-        systemd-repart --dry-run=no
+            systemd-repart --dry-run=no
 fi
 systemctl restart systemd-growfs-root.service || true
 
@@ -173,7 +187,7 @@ EOF
 
     assets::write "systemd/rpi5-firstboot.service" "$target/etc/systemd/system/rpi5-firstboot.service"
 
-    bootstrap::systemd_enable_unit "$target" "rpi5-firstboot.service" "multi-user.target.wants"
+    bootstrap::systemd_enable_custom_unit "$target" "rpi5-firstboot.service" "multi-user.target.wants"
 }
 
 # Настройка системных параметров внутри образа
