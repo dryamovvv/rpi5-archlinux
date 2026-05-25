@@ -16,14 +16,9 @@ fail() {
   exit 1
 }
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# Source bootstrap functions
-source "$repo_root/src/lib/log.sh" 2>/dev/null || true
-# Redefine the function inline to avoid dependency on full bootstrap
 bootstrap::systemd_enable_custom_unit() {
   local target="$1"
   local unit="$2"

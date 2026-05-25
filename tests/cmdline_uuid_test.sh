@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# Mock log functions
 log::info() { :; }
 log::success() { :; }
 log::warn() { :; }
@@ -19,26 +18,20 @@ fail() {
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Source necessary functions
-source "$repo_root/src/lib/log.sh" 2>/dev/null || true
-source "$repo_root/src/lib/core/assets.sh"
-
 # Mock assets::write to capture output
-CAPTURED_FILE=""
-CAPTURED_CONTENT=""
-assets::write() {
-  CAPTURED_FILE="$2"
-  echo "root=UUID=__ROOT_UUID__ rw rootwait" >"$2"
-}
+assets::write() { echo "root=UUID=__ROOT_UUID__ rw rootwait" >"$2"; }
 
+# shellcheck disable=SC2034
 BUILD_ROOT_UUID="test-uuid-1234"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
+source "$repo_root/src/lib/log.sh" 2>/dev/null || true
+export BUILD_PROJECT_ROOT="$repo_root"
+source "$repo_root/src/lib/core/assets.sh" 2>/dev/null || true
 source "$repo_root/src/lib/bootstrap.sh" 2>/dev/null || true
 bootstrap::cmdline_txt "$TMPDIR"
 
-# Check the file
 if grep -q '__ROOT_UUID__' "$TMPDIR/cmdline.txt"; then
   fail "UUID placeholder was NOT substituted"
 fi

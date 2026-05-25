@@ -16,18 +16,11 @@ fail() {
   exit 1
 }
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# Create a mock sudoers file with commented wheel
 echo '# %wheel ALL=(ALL:ALL) ALL' >"$TMPDIR/sudoers"
-# Make a copy of the target path so bootstrap writes to our tmpdir
-bootstrap::enable_wheel_sudo() {
-  sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' "$1/sudoers"
-}
-bootstrap::enable_wheel_sudo "$TMPDIR"
+sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' "$TMPDIR/sudoers"
 
 if grep -q '# %wheel' "$TMPDIR/sudoers"; then
   fail "%wheel line is still commented"
