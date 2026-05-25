@@ -1,5 +1,6 @@
 [Unit]
 Description=Complete first boot provisioning
+ConditionFirstBoot=yes
 After=network.target
 
 [Service]
