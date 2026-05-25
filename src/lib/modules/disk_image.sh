@@ -36,6 +36,10 @@ disk_image::create_filesystems() {
 
     disk::format_partition "$part_boot" "vfat"
     disk::format_partition "$part_root" "ext4"
+
+    BUILD_ROOT_UUID="$(blkid -s UUID -o value "$part_root")"
+    readonly BUILD_ROOT_UUID
+    log::info "Root partition UUID: $BUILD_ROOT_UUID"
 }
 
 disk_image::mount_filesystems() {
