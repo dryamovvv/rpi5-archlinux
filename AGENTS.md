@@ -69,3 +69,24 @@ for t in tests/*.sh; do bash "$t" || echo "FAIL: $t"; done
 ```bash
 git branch -f dev main && git push origin dev --force
 ```
+
+## QEMU — локальное тестирование на x86_64
+
+**Порядок работы:** изменил код → пересобрал `./scripts/package.sh` → собрал QEMU-образ → запустил → проверил загрузку → только потом коммит и пуш.
+Сборка на x86_64 через qemu-user-static занимает ~25 минут (против 2 минут на ARM).
+
+```bash
+# Собрать QEMU-образ (использует linux-aarch64 вместо linux-rpi-16k)
+./dist/bin/rpi5-archlinux-image build-qemu
+
+# Запустить (SSH на localhost:2222, Ctrl+A X для выхода)
+./dist/bin/rpi5-archlinux-image qemu-run
+```
+
+**Важно:** QEMU не тестирует config.txt и Pi-специфичные параметры (overclock, device tree).
+Для них — только CI на `dev` ветке или реальное железо.
+
+**Известные ограничения:**
+- systemd-firstboot не интерактивен в QEMU (нет tty) — hostname будет `archlinux`
+- `arm_freq`, `over_voltage_delta`, `disable_splash` — только на реальном Pi
+- Порты переиспользуются — убить старый QEMU: `sudo pkill -f qemu-system`
