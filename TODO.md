@@ -92,7 +92,7 @@ root=UUID=... rw rootwait console=tty1 fsck.repair=yes
 root=UUID=... rw rootwait console=tty1 fsck.repair=yes quiet loglevel=3 mitigations=off nowatchdog numa=fake=8
 ```
 
-`numa=fake=8` эмулирует NUMA на big.LITTLE (4×A76 + 4×A55), дает +18-32% multi-core производительности. Требует ядро с поддержкой NUMA (есть в linux-rpi-16k).
+`numa=fake=8` эмулирует NUMA на big.LITTLE (4×A76 + 4×A55), дает +18-32% multi-core производительности. **Требует проверки:** в `linux-rpi-16k` из Arch ARM должна быть включена опция `CONFIG_NUMA_EMULATION`. Без нее параметр `numa=fake=8` будет проигнорирован ядром с предупреждением в dmesg. Проверить после загрузки: `ls /sys/devices/system/node/` — если есть node0, node1,... → NUMA работает.
 
 ### 3.4 Дополнительные параметры (обсуждаемы)
 
