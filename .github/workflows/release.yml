@@ -59,6 +59,28 @@ jobs:
           test -f "dist/images/${image_name}"
           sha256sum "dist/images/${image_name}" > "dist/images/${checksum_name}"
 
+      - name: Update os_list.json
+        run: |
+          img_raw="dist/images/archlinux-rpi5-aarch64.img"
+          img_xz="dist/images/archlinux-rpi5-aarch64.img.xz"
+
+          extract_size=$(stat -c%s "$img_raw")
+          extract_sha256=$(sha256sum "$img_raw" | cut -d' ' -f1)
+          download_size=$(stat -c%s "$img_xz")
+          download_sha256=$(sha256sum "$img_xz" | cut -d' ' -f1)
+
+          sed -i "s/__EXTRACT_SHA256__/$extract_sha256/" os_list.json
+          sed -i "s/__DOWNLOAD_SHA256__/$download_sha256/" os_list.json
+          sed -i "s/\"extract_size\": 4294967296/\"extract_size\": $extract_size/" os_list.json
+          sed -i "s/\"image_download_size\": 500000000/\"image_download_size\": $download_size/" os_list.json
+          sed -i "s/\"release_date\": \"2026-05-26\"/\"release_date\": \"$(date +%Y-%m-%d)\"/" os_list.json
+
+          echo "os_list.json updated:"
+          cat os_list.json
+
+          # Append os_list.json to release assets (shared via temp file)
+          echo 'os_list.json' >> /tmp/release_assets.txt
+
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -69,6 +91,12 @@ jobs:
             "dist/images/${image_name}"
             "dist/images/${checksum_name}"
           )
+          # Append any additional assets from previous step
+          if [[ -f /tmp/release_assets.txt ]]; then
+            while IFS= read -r asset; do
+              [[ -n "$asset" ]] && release_assets+=("$asset")
+            done < /tmp/release_assets.txt
+          fi
 
           gh release create "$GITHUB_REF_NAME" \
             "${release_assets[@]}" \

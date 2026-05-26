@@ -132,3 +132,34 @@ sudo rpi-eeprom-config --edit
   BUILD_MKINITCPIO_COMPRESSION="cat"
   ```
   Это создает несжатый initramfs, что значительно ускоряет сборку ценой большего размера boot-раздела.
+
+## Установка через Network Install (без SD-карты)
+
+Raspberry Pi 5 поддерживает установку ОС напрямую через сеть (Ethernet), без необходимости записывать образ на SD-карту с другого компьютера.
+
+### Разовая настройка EEPROM
+
+На **любой** уже работающей Raspberry Pi (с любой ОС) выполните однократно:
+
+```bash
+sudo rpi-eeprom-config --edit
+```
+
+Добавьте строку:
+
+```
+IMAGER_REPO_URL=https://raw.githubusercontent.com/dryamovvv/archlinux-rpi5-aarch64/main/os_list.json
+```
+
+Сохраните и перезагрузитесь. Эта настройка сохраняется в EEPROM навсегда (до следующего сброса EEPROM).
+
+### Установка образа
+
+1. Подключите Raspberry Pi 5 к Ethernet и питанию (SD-карта не нужна)
+2. Нажмите **Space** на экране загрузки, затем **N**
+3. Raspberry Pi скачает Imager по сети
+4. В списке ОС выберите **Arch Linux ARM for Raspberry Pi 5**
+5. Выберите целевой накопитель (SD-карту или NVMe)
+6. Нажмите Write — образ запишется напрямую с GitHub Releases
+
+После записи извлеките SD-карту (или оставьте NVMe) и перезагрузитесь — система загрузится в Arch Linux ARM.
