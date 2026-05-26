@@ -55,8 +55,8 @@
     "hide": "never"
   },
   {
-    "label": "git: commit and push",
-    "command": "git add -A && GIT_EDITOR=true git commit && git push origin main",
+    "label": "git: commit and push to dev",
+    "command": "git add -A && GIT_EDITOR=true git commit && git branch -f dev main && git push origin dev --force",
     "hide": "never"
   },
   {

@@ -45,7 +45,10 @@ for t in tests/*.sh; do bash "$t" || echo "FAIL: $t"; done
 2. **Не удаляй `config.txt`** — он статический, правки напрямую
 3. **Пароли не хранить в коде** — пользователь задает при первой загрузке
 4. **Отступ 4 пробела** в .sh, функции с namespace `module::function`
-5. **Пуш в `dev`** триггерит ARM-сборку в CI: `git branch -f dev main && git push origin dev --force`
+5. **Пуш в `dev`** триггерит ARM-сборку в CI. **В `main` без разрешения НЕ пушить.**
+   ```bash
+   git branch -f dev main && git push origin dev --force
+   ```
 
 ## CI/CD
 
