@@ -23,19 +23,37 @@
 ### 2.1 Параметры
 
 ```bash
-# CPU frequency: 2400 (stock), 2800 (safe), 3000 (max, needs cooling)
+# CPU frequency: 2400 (stock), 2800 (safe with Active Cooler), 3000 (max with 27W PSU + Active Cooler)
 BUILD_ARM_FREQ=2800
 # GPU 3D frequency: 960 (stock), 1000 (safe)
-BUILD_V3D_FREQ=960
+BUILD_V3D_FREQ=1000
 # Core frequency: 910 (stock)
 BUILD_CORE_FREQ=910
-# Voltage offset in microvolts: 0 (stock), 20000-50000
-BUILD_OVER_VOLTAGE_DELTA=20000
-# Force turbo (keeps max freq, enables higher voltages): 0 or 1
+# Voltage offset in microvolts: 0 (stock), 25000 (2.8GHz), 50000 (3.0GHz), 72000 (extreme)
+# DVFS remains active — voltage scales with load, no idle power waste
+BUILD_OVER_VOLTAGE_DELTA=25000
+# Force turbo (keeps max freq, disables DVFS, enables higher voltages): 0 or 1
 BUILD_FORCE_TURBO=0
 ```
 
-### 2.2 Генерация config.txt
+### 2.2 SDRAM tuning (EEPROM)
+
+**Требует прошивки EEPROM** (не config.txt):
+```bash
+# В rpi-eeprom-config добавить:
+SDRAM_BANKLOW=1
+```
+Дает +10-20% к пропускной способности памяти на стоковых частотах.
+На Pi 4: `SDRAM_BANKLOW=3`.
+
+### 2.3 Важные замечания
+
+- **Охлаждение:** Active Cooler — минимум для 2.8 GHz, Argon ONE V3 — для 3.0 GHz
+- **Блок питания:** официальный 27W (5V/5A) — обязательно для 3.0 GHz+
+- **DVFS:** использовать `over_voltage_delta` (не старый `over_voltage`) — сохраняет динамическое напряжение
+- **Стабильность:** ~50% Pi 5 держат 3.0 GHz, выше 3.2 GHz — единицы
+
+### 2.4 Генерация config.txt
 
 В секцию `[pi5]` config.txt добавляются **только заданные** параметры:
 ```ini
@@ -71,8 +89,10 @@ root=UUID=... rw rootwait console=tty1 fsck.repair=yes
 ### 3.3 Профиль `prod`
 
 ```
-root=UUID=... rw rootwait console=tty1 fsck.repair=yes quiet loglevel=3 mitigations=off nowatchdog
+root=UUID=... rw rootwait console=tty1 fsck.repair=yes quiet loglevel=3 mitigations=off nowatchdog numa=fake=8
 ```
+
+`numa=fake=8` эмулирует NUMA на big.LITTLE (4×A76 + 4×A55), дает +18-32% multi-core производительности. Требует ядро с поддержкой NUMA (есть в linux-rpi-16k).
 
 ### 3.4 Дополнительные параметры (обсуждаемы)
 
