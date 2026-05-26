@@ -148,7 +148,7 @@ sudo rpi-eeprom-config --edit
 Добавьте строку:
 
 ```
-IMAGER_REPO_URL=https://raw.githubusercontent.com/dryamovvv/archlinux-rpi5-aarch64/main/os_list.json
+IMAGER_REPO_URL=https://github.com/dryamovvv/archlinux-rpi5-aarch64/releases/latest/download/os_list.json
 ```
 
 Сохраните и перезагрузитесь. Эта настройка сохраняется в EEPROM навсегда (до следующего сброса EEPROM).
