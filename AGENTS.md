@@ -90,3 +90,12 @@ git branch -f dev main && git push origin dev --force
 - systemd-firstboot не интерактивен в QEMU (нет tty) — hostname будет `archlinux`
 - `arm_freq`, `over_voltage_delta`, `disable_splash` — только на реальном Pi
 - Порты переиспользуются — убить старый QEMU: `sudo pkill -f qemu-system`
+
+**Что проверять после QEMU-сборки:**
+1. `grep -c '\\[FAIL\\]' build-qemu.log` — должно быть 0
+2. `grep 'Image build completed' build-qemu.log` — должен быть
+3. После `qemu-run`: `grep 'Finished Complete first boot' qemu-boot.log` — firstboot отработал
+4. `grep 'FAILED\\|error\\|Error' qemu-boot.log` — не должно быть (кроме `regulatory.db`)
+5. Попробовать SSH: `ssh -p 2222 dryam@localhost` (пароль пустой, сменит при входе)
+6. `systemctl is-system-running` → `running`
+7. `systemctl list-units --state=failed` → пусто
