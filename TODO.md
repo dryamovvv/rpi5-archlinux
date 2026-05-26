@@ -188,7 +188,7 @@ echo "FIRMWARE_RELEASE_STATUS=\"$BUILD_EEPROM_CHANNEL\"" > "$target/etc/default/
 
 ### 7.2 `kernel_2712.img`
 
-Pi 5 firmware по умолчанию ищет `kernel_2712.img` (16K pages) и fallback на `kernel8.img`. `linux-rpi-16k` должен предоставлять `kernel_2712.img`. Переключиться на него вместо `kernel8.img`.
+Pi 5 firmware по умолчанию ищет `kernel_2712.img` (16K pages) и fallback на `kernel8.img`. Пакет `linux-rpi-16k` должен предоставлять `kernel_2712.img`, но **нужно проверить** — какой именно файл ядра оказывается в `/boot` после `pacstrap`. Возможно, пакет кладет только `kernel8.img` (4K) несмотря на название 16K. Сейчас `config.txt` форсит `kernel=kernel8.img`. При наличии `kernel_2712.img` — убрать строку `kernel=` из `config.txt`, прошивка сама выберет правильное 16K-ядро.
 
 ---
 
