@@ -95,6 +95,9 @@ jobs:
       - name: Package builder
         run: |
           cp build.conf.example build.conf
+          # Fast dev build: no compression, no shrink
+          echo 'BUILD_MKINITCPIO_COMPRESSION="cat"' >> build.conf
+          echo 'BUILD_SHRINK_IMAGE=0' >> build.conf
           ./scripts/package.sh
 
       - name: Build Arch Linux image
