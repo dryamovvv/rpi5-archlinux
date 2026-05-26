@@ -390,8 +390,14 @@ disk::format_partition() {
         else
             log::die "Не удалось отформатировать раздел $part в $fs_type"
         fi
-    elif [[ "$fs_type" == "ext4" ]] >/dev/null; then
-        if mkfs.ext4 -q -L Archlinux "$part"; then
+    elif [[ "$fs_type" == "ext4" ]]; then
+        if mkfs.ext4 -q -L archlinux "$part" >/dev/null; then
+            log::info "Раздел $part отформатирован в $fs_type"
+        else
+            log::die "Не удалось отформатировать раздел $part в $fs_type"
+        fi
+    elif [[ "$fs_type" == "btrfs" ]]; then
+        if mkfs.btrfs -f -L archlinux "$part" >/dev/null; then
             log::info "Раздел $part отформатирован в $fs_type"
         else
             log::die "Не удалось отформатировать раздел $part в $fs_type"
@@ -428,6 +434,67 @@ disk::mount_target() {
         log::info "Смонтирован раздел $source в $target"
     else
         log::die "Не удалось смонтировать раздел $source в $target"
+    fi
+}
+
+disk::btrfs_subvol_create_all() {
+    local mount_point="$1"
+
+    log::assert_not_empty "$mount_point" "временная точка монтирования btrfs"
+
+    log::info "Создание btrfs subvolumes..."
+    local subvolumes=(
+        "@"
+        "@home"
+        "@snapshots"
+        "@var_log"
+        "@var_cache"
+        "@var_tmp"
+        "@var_lib"
+    )
+    local sv=""
+    for sv in "${subvolumes[@]}"; do
+        if btrfs subvolume create "$mount_point/$sv" >/dev/null; then
+            log::info "Создан subvolume: $sv"
+        else
+            log::die "Не удалось создать subvolume: $sv"
+        fi
+    done
+    log::success "Subvolumes созданы"
+}
+
+disk::btrfs_mount_subvol_root() {
+    local dev="$1"
+    local target="$2"
+
+    log::assert_not_empty "$dev" "устройство"
+    log::assert_not_empty "$target" "точка монтирования"
+
+    [[ -d "$target" ]] || mkdir -p "$target"
+
+    if mount -o subvol=@,compress=zstd,noatime "$dev" "$target"; then
+        log::info "@ смонтирован в $target"
+    else
+        log::die "Не удалось смонтировать @ в $target"
+    fi
+}
+
+disk::btrfs_mount_subvol() {
+    local dev="$1"
+    local subvol="$2"
+    local target="$3"
+    local options="${4:-defaults}"
+
+    log::assert_not_empty "$dev" "устройство"
+    log::assert_not_empty "$subvol" "subvolume"
+    log::assert_not_empty "$target" "точка монтирования"
+
+    [[ -d "$target" ]] || mkdir -p "$target"
+
+    if mount -o "subvol=$subvol,$options" "$dev" "$target"; then
+        log::info "$subvol смонтирован в $target ($options)"
+    else
+        log::die "Не удалось смонтировать $subvol в $target"
     fi
 }
 

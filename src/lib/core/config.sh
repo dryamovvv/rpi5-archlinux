@@ -39,6 +39,11 @@ config::select_qemu() {
   BUILD_QEMU_MEMORY="${BUILD_QEMU_MEMORY:-2048}"
   BUILD_QEMU_SSH_HOST_PORT="${BUILD_QEMU_SSH_HOST_PORT:-2222}"
   BUILD_QEMU_KERNEL_CMDLINE="${BUILD_QEMU_KERNEL_CMDLINE:-root=/dev/vda2 rw rootwait console=ttyAMA0}"
+  BUILD_QEMU_ROOTFLAGS="${BUILD_QEMU_ROOTFLAGS:-}"
+
+  if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]] && [[ -z "$BUILD_QEMU_ROOTFLAGS" ]]; then
+    BUILD_QEMU_ROOTFLAGS="subvol=@"
+  fi
 
   if declare -p BUILD_QEMU_MODULES >/dev/null 2>&1; then
     BUILD_MODULES=("${BUILD_QEMU_MODULES[@]}")
@@ -66,7 +71,12 @@ config::select_qemu() {
 }
 
 config::validate() {
+  BUILD_FILESYSTEM="${BUILD_FILESYSTEM:-ext4}"
   BUILD_IMAGE_SHRINK_MARGIN="${BUILD_IMAGE_SHRINK_MARGIN:-256M}"
+
+  if [[ "$BUILD_FILESYSTEM" != "ext4" && "$BUILD_FILESYSTEM" != "btrfs" ]]; then
+    log::die "BUILD_FILESYSTEM must be 'ext4' or 'btrfs', got: '$BUILD_FILESYSTEM'"
+  fi
 
   local required_values=(
     "${BUILD_IMAGE_PATH:-}"

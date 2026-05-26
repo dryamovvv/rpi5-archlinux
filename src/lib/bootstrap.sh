@@ -88,12 +88,44 @@ bootstrap::generate_fstab() {
     local target="$1"
     log::assert_not_empty "$target" "точка монтирования"
 
+    if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
+        bootstrap::generate_btrfs_fstab "$target"
+        return
+    fi
+
     log::info "Генерация /etc/fstab..."
-    # -U использует UUID разделов (стандарт безопасности)
-    # Добавляем nofail для /boot, чтобы отсутствие boot-раздела не блокировало загрузку
     genfstab -U "$target" >"$target/etc/fstab"
     bootstrap::add_nofail_to_boot "$target/etc/fstab"
     bootstrap::disable_swap "$target"
+}
+
+bootstrap::generate_btrfs_fstab() {
+    local target="$1"
+    log::assert_not_empty "$target" "точка монтирования"
+
+    local root_uuid="${BUILD_ROOT_UUID:-}"
+    log::assert_not_empty "$root_uuid" "BUILD_ROOT_UUID"
+
+    local boot_part=""
+    disk::resolve_partition_path "$CURRENT_LOOP_DEV" 1
+    boot_part="$RESOLVED_PARTITION_PATH"
+    local boot_uuid=""
+    boot_uuid="$(blkid -s UUID -o value "$boot_part")"
+    log::assert_not_empty "$boot_uuid" "ESP UUID"
+
+    log::info "Генерация /etc/fstab для btrfs subvolume layout..."
+    cat <<EOF >"$target/etc/fstab"
+# /etc/fstab — btrfs subvolume layout
+UUID=$root_uuid /          btrfs rw,noatime,compress=zstd,subvol=@       0 0
+UUID=$root_uuid /home      btrfs rw,noatime,compress=zstd,subvol=@home    0 0
+UUID=$root_uuid /.snapshots btrfs rw,noatime,subvol=@snapshots            0 0
+UUID=$root_uuid /var/log   btrfs rw,noatime,compress=zstd,subvol=@var_log 0 0
+UUID=$root_uuid /var/cache btrfs rw,noatime,nodatacow,subvol=@var_cache   0 0
+UUID=$root_uuid /var/tmp   btrfs rw,noatime,nodatacow,subvol=@var_tmp     0 0
+UUID=$root_uuid /var/lib   btrfs rw,noatime,nodatacow,subvol=@var_lib     0 0
+UUID=$boot_uuid /boot      vfat defaults,noatime,nofail                    0 0
+EOF
+    log::success "/etc/fstab для btrfs создан"
 }
 
 bootstrap::fix_vconsole() {
@@ -212,6 +244,12 @@ bootstrap::cmdline_txt() {
       log::warn "BUILD_ROOT_UUID не задан — cmdline.txt содержит плейсхолдер __ROOT_UUID__"
     fi
 
+    if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
+      sed -i 's/ fsck.repair=yes//' "$target/cmdline.txt"
+      sed -i 's/$/ rootflags=subvol=@/' "$target/cmdline.txt"
+      log::info "cmdline.txt: добавлен rootflags=subvol=@"
+    fi
+
     if [[ -s "$target/cmdline.txt" ]]; then
       log::success "$target/cmdline.txt создан!"
     else
@@ -239,8 +277,16 @@ bootstrap::mkinitcpio_conf() {
     log::assert_not_empty "$target" "точка монтирования"
     log::assert_not_empty "$new_hooks" "новая строка HOOKS"
     log::info "Обновляем $target/etc/mkinitcpio.conf..."
+
+    if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
+        new_hooks="${new_hooks//fsck /}"
+        new_hooks="${new_hooks// fsck)/)}"
+        sed -i 's/^MODULES=(.*/MODULES=(vfat btrfs)/' "$target/etc/mkinitcpio.conf"
+    else
+        sed -i 's/^MODULES=(.*/MODULES=(vfat)/' "$target/etc/mkinitcpio.conf"
+    fi
+
     sed -i "s/^HOOKS=(.*/$new_hooks/" "$target/etc/mkinitcpio.conf"
-    sed -i 's/^MODULES=(.*/MODULES=(vfat)/' "$target/etc/mkinitcpio.conf"
     sed -i 's/^COMPRESSION="zstd"/#COMPRESSION="zstd"/' "$target/etc/mkinitcpio.conf"
     if [[ -n "${BUILD_MKINITCPIO_COMPRESSION:-}" ]]; then
         sed -i "s/^#COMPRESSION=.*/COMPRESSION=${BUILD_MKINITCPIO_COMPRESSION}/" "$target/etc/mkinitcpio.conf"
@@ -341,6 +387,27 @@ EOF
 bootstrap::resize_root() {
     local target="$1"
     log::assert_not_empty "$target" "точка монтирования"
+
+    if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
+        log::info "Создаем btrfs grow service..."
+        cat <<'EOF' >"$target/etc/systemd/system/btrfs-grow.service"
+[Unit]
+Description=Grow btrfs filesystem to fill partition
+After=local-fs.target
+Before=sysinit.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/btrfs filesystem resize max /
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target
+EOF
+        bootstrap::systemd_enable_custom_unit "$target" "btrfs-grow.service" "sysinit.target.wants"
+        return
+    fi
+
     log::info "Вызовем репарт при первой загрузке"
     mkdir -p "$target/etc/repart.d"
     cat <<EOF >"$target/etc/repart.d/50-root.conf"
@@ -349,4 +416,102 @@ Type=root-arm64
 GrowFileSystem=yes
 EOF
     bootstrap::systemd_enable_unit "$target" "systemd-growfs-root.service" "multi-user.target.wants"
+}
+
+bootstrap::btrfs_setup_snapper() {
+    local target="$1"
+    log::assert_not_empty "$target" "точка монтирования"
+
+    log::info "Настройка snapper для btrfs..."
+
+    local snap_mount="$target/.snapshots"
+    local root_part=""
+    disk::resolve_partition_path "$CURRENT_LOOP_DEV" 2
+    root_part="$RESOLVED_PARTITION_PATH"
+
+    if mountpoint -q "$snap_mount" 2>/dev/null; then
+        umount "$snap_mount"
+    fi
+    rmdir "$snap_mount" 2>/dev/null || true
+
+    arch-chroot "$target" snapper -c root create-config /
+
+    if btrfs subvolume delete "$target/.snapshots" >/dev/null 2>&1; then
+        log::info "Удален вложенный .snapshots subvolume внутри @"
+    fi
+
+    mkdir -p "$snap_mount"
+    mount -o subvol=@snapshots,noatime "$root_part" "$snap_mount"
+    chmod 750 "$snap_mount"
+
+    bootstrap::systemd_enable_unit "$target" "snapper-timeline.timer" "timers.target.wants"
+    bootstrap::systemd_enable_unit "$target" "snapper-cleanup.timer" "timers.target.wants"
+
+    arch-chroot "$target" snapper -c root set-config "TIMELINE_CREATE=yes"
+    arch-chroot "$target" snapper -c root set-config "TIMELINE_CLEANUP=yes"
+    arch-chroot "$target" snapper -c root set-config "TIMELINE_LIMIT_HOURLY=5"
+    arch-chroot "$target" snapper -c root set-config "TIMELINE_LIMIT_DAILY=7"
+    arch-chroot "$target" snapper -c root set-config "TIMELINE_LIMIT_WEEKLY=4"
+    arch-chroot "$target" snapper -c root set-config "TIMELINE_LIMIT_MONTHLY=3"
+    arch-chroot "$target" snapper -c root set-config "TIMELINE_LIMIT_YEARLY=2"
+
+    log::success "Snapper настроен"
+}
+
+bootstrap::btrfs_write_rollback_script() {
+    local target="$1"
+    log::assert_not_empty "$target" "точка монтирования"
+
+    local rollback_dir="$target/usr/local/lib/rpi5-archlinux"
+    mkdir -p "$rollback_dir"
+
+    cat <<'ROLLBACKSCRIPT' >"$rollback_dir/rollback.sh"
+#!/bin/bash
+set -euo pipefail
+
+ROLLBACK_NUM="${1:-}"
+
+if [[ -z "$ROLLBACK_NUM" ]]; then
+    echo "Usage: rollback.sh <snapshot_number>"
+    echo ""
+    echo "Available snapshots:"
+    snapper -c root list
+    exit 1
+fi
+
+ROOT_DEV="$(findmnt -n -o SOURCE /)"
+
+echo "==> Snapshot #$ROLLBACK_NUM will replace the current @ subvolume."
+echo "==> WARNING: All changes since the snapshot will be lost!"
+read -rp "Continue? [y/N] " confirm
+[[ "$confirm" == "y" || "$confirm" == "Y" ]] || { echo "Aborted."; exit 0; }
+
+echo "==> Mounting top-level subvolume..."
+mkdir -p /tmp/btrfs_top
+mount -o subvolid=5 "$ROOT_DEV" /tmp/btrfs_top
+
+SNAP_SUBVOL="/tmp/btrfs_top/@snapshots/$ROLLBACK_NUM/snapshot"
+if [[ ! -d "$SNAP_SUBVOL" ]]; then
+    echo "ERROR: Snapshot $ROLLBACK_NUM not found"
+    umount /tmp/btrfs_top
+    rmdir /tmp/btrfs_top
+    exit 1
+fi
+
+echo "==> Moving current @ to @.old..."
+mv /tmp/btrfs_top/@ /tmp/btrfs_top/@.old
+
+echo "==> Creating read-write snapshot of #$ROLLBACK_NUM as new @..."
+btrfs subvolume snapshot "$SNAP_SUBVOL" /tmp/btrfs_top/@
+
+umount /tmp/btrfs_top
+rmdir /tmp/btrfs_top
+
+echo ""
+echo "==> Rollback complete. Reboot to use the restored system."
+echo "    Old root preserved as @.old — delete manually after reboot."
+echo "    sudo reboot"
+ROLLBACKSCRIPT
+    chmod 0755 "$rollback_dir/rollback.sh"
+    log::info "Rollback script: /usr/local/lib/rpi5-archlinux/rollback.sh"
 }

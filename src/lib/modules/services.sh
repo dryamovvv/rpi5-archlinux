@@ -11,10 +11,8 @@ services::register() {
 }
 
 services::configure_system() {
-  # Add locale to /etc/locale.gen before systemd-firstboot runs locale-gen
   bootstrap::locale_gen_file "$BUILD_MOUNT_ROOT"
   bootstrap::systemd_firstboot "$BUILD_MOUNT_ROOT"
-  # Run locale-gen now (systemd-firstboot already wrote LANG=)
   arch-chroot "$BUILD_MOUNT_ROOT" locale-gen 2>&1 || log::warn "locale-gen encountered issues"
   bootstrap::firstboot_service "$BUILD_MOUNT_ROOT" "$BUILD_USER_NAME"
 }
@@ -24,7 +22,6 @@ services::configure_services() {
   bootstrap::sshd "$BUILD_MOUNT_ROOT" "$BUILD_SSH_USER"
   bootstrap::enable_wheel_sudo "$BUILD_MOUNT_ROOT"
 
-  # ZRAM
   if [[ "${BUILD_ENABLE_ZRAM:-0}" == "1" ]]; then
     cat >"$BUILD_MOUNT_ROOT/etc/systemd/zram-generator.conf" <<'EOF'
 [zram0]
@@ -39,26 +36,27 @@ EOF
   bootstrap::cpu_boost "$BUILD_MOUNT_ROOT"
   bootstrap::wifi_regdom "$BUILD_MOUNT_ROOT"
 
-  # Native systemd units for partition/filesystem growth
-  bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-repart.service" "sysinit.target.wants"
-  bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-growfs-root.service" "sysinit.target.wants"
+  if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
+    bootstrap::resize_root "$BUILD_MOUNT_ROOT"
+    bootstrap::btrfs_setup_snapper "$BUILD_MOUNT_ROOT"
+    bootstrap::btrfs_write_rollback_script "$BUILD_MOUNT_ROOT"
+  else
+    bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-repart.service" "sysinit.target.wants"
+    bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-growfs-root.service" "sysinit.target.wants"
+  fi
 
-  # Enable interactive systemd-firstboot for hostname/timezone/root password
   bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-firstboot.service" "sysinit.target.wants"
 
-  # EEPROM update channel
   if [[ -n "${BUILD_EEPROM_CHANNEL:-}" ]]; then
     mkdir -p "$BUILD_MOUNT_ROOT/etc/default"
     echo "FIRMWARE_RELEASE_STATUS=\"$BUILD_EEPROM_CHANNEL\"" >"$BUILD_MOUNT_ROOT/etc/default/rpi-eeprom-update"
     log::info "EEPROM channel: $BUILD_EEPROM_CHANNEL"
   fi
 
-  # fail2ban
   mkdir -p "$BUILD_MOUNT_ROOT/etc/fail2ban/jail.d"
   assets::write "fail2ban/sshd.conf" "$BUILD_MOUNT_ROOT/etc/fail2ban/jail.d/sshd.conf"
   bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "fail2ban.service" "multi-user.target.wants"
 
-  # Wi-Fi (optional)
   if [[ "${BUILD_ENABLE_WIFI:-0}" == "1" ]]; then
     log::info "Wi-Fi enabled"
     mkdir -p "$BUILD_MOUNT_ROOT/etc/wpa_supplicant"

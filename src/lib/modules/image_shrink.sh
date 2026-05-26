@@ -10,5 +10,9 @@ image_shrink::register() {
 }
 
 image_shrink::shrink() {
+    if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
+        log::info "Btrfs: пропускаем shrink (не поддерживается)"
+        return 0
+    fi
     disk::shrink_image "$BUILD_IMAGE_PATH" "$CURRENT_LOOP_DEV" 2 "$BUILD_IMAGE_SHRINK_MARGIN"
 }

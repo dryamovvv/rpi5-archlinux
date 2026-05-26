@@ -47,7 +47,11 @@ qemu_boot_config::export_boot_artifacts() {
 
     cp "$kernel_source" "$BUILD_QEMU_BOOT_DIR/Image"
     cp "$initramfs_source" "$BUILD_QEMU_BOOT_DIR/initramfs-linux.img"
-    printf '%s\n' "$BUILD_QEMU_KERNEL_CMDLINE" >"$BUILD_QEMU_BOOT_DIR/cmdline.txt"
+    local qemu_cmdline="$BUILD_QEMU_KERNEL_CMDLINE"
+    if [[ -n "${BUILD_QEMU_ROOTFLAGS:-}" ]]; then
+        qemu_cmdline="$qemu_cmdline rootflags=$BUILD_QEMU_ROOTFLAGS"
+    fi
+    printf '%s\n' "$qemu_cmdline" >"$BUILD_QEMU_BOOT_DIR/cmdline.txt"
 }
 
 qemu_boot_config::finalize_artifact_permissions() {

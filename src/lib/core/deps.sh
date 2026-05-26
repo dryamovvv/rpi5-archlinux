@@ -20,7 +20,7 @@ deps::require_commands() {
 }
 
 deps::validate_build_commands() {
-    deps::require_commands \
+    local required=( \
         aria2c \
         blockdev \
         dumpe2fs \
@@ -40,7 +40,14 @@ deps::validate_build_commands() {
         sfdisk \
         systemd-firstboot \
         udevadm \
-        umount
+        umount \
+    )
+
+    if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
+        required+=(mkfs.btrfs btrfs)
+    fi
+
+    deps::require_commands "${required[@]}"
 }
 
 deps::validate_qemu_commands() {
