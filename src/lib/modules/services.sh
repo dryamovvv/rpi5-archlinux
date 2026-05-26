@@ -46,6 +46,13 @@ EOF
   # Enable interactive systemd-firstboot for hostname/timezone/root password
   bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-firstboot.service" "sysinit.target.wants"
 
+  # EEPROM update channel
+  if [[ -n "${BUILD_EEPROM_CHANNEL:-}" ]]; then
+    mkdir -p "$BUILD_MOUNT_ROOT/etc/default"
+    echo "FIRMWARE_RELEASE_STATUS=\"$BUILD_EEPROM_CHANNEL\"" >"$BUILD_MOUNT_ROOT/etc/default/rpi-eeprom-update"
+    log::info "EEPROM channel: $BUILD_EEPROM_CHANNEL"
+  fi
+
   # fail2ban
   mkdir -p "$BUILD_MOUNT_ROOT/etc/fail2ban/jail.d"
   assets::write "fail2ban/sshd.conf" "$BUILD_MOUNT_ROOT/etc/fail2ban/jail.d/sshd.conf"

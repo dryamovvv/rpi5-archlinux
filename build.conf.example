@@ -73,7 +73,18 @@ BUILD_PACKAGES=(
     "fail2ban"
     "wpa_supplicant"
     "avahi"
+    "s-tui"
+    "stress-ng"
+    "fio"
+    "hdparm"
+    "btop"
+    "rpi5-eeprom"
+    "flashrom"
+    "nvme-cli"
 )
+
+# EEPROM update channel: "default" (stable) or "latest" (newer, +performance)
+BUILD_EEPROM_CHANNEL="latest"
 
 BUILD_QEMU_MODULES=(
     "disk_image"
@@ -108,4 +119,10 @@ BUILD_QEMU_PACKAGES=(
     "fail2ban"
     "wpa_supplicant"
     "avahi"
+    "s-tui"
+    "stress-ng"
+    "fio"
+    "hdparm"
+    "btop"
+    "nvme-cli"
 )

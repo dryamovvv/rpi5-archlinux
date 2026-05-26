@@ -1,1 +1,1 @@
-root=UUID=__ROOT_UUID__ rw rootwait console=tty1 fsck.repair=yes nvme.max_host_mem_size_mb=128 cgroup_enable=memory swapaccount=1
+root=UUID=__ROOT_UUID__ rw rootwait console=tty1 fsck.repair=yes quiet loglevel=3 mitigations=off nowatchdog

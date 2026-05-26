@@ -3,11 +3,15 @@
 # Some settings may impact device functionality. See link above for details
 
 [pi5]
-kernel=kernel8.img
+# Pi 5 auto-detects kernel_2712.img (16K) with fallback to kernel8.img (4K)
 auto_initramfs=1
 initramfs initramfs-linux.img follow-kernel
 arm_64bit=1
 arm_boost=1
+# Safe overclock: 2.8 GHz (requires Active Cooler)
+arm_freq=2800
+over_voltage_delta=25000
+# No gpu_freq/v3d_freq — setting them limits CPU overclock ceiling
 overlay_prefix=overlays/
 dtparam=pciex1_gen=3
 dtoverlay=disable-wifi
@@ -19,5 +23,6 @@ max_framebuffers=2
 dtparam=audio=on
 camera_auto_detect=0
 display_auto_detect=0
+disable_splash=1
 
 [all]
