@@ -1,19 +1,71 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-Этот репозиторий собирает образ Arch Linux для Raspberry Pi 5 с помощью Bash-скриптов. Исходный CLI entrypoint хранится в `src/main.sh`, а поддерживаемый запускаемый файл собирается в `dist/bin/rpi5-archlinux-image`. Framework-код вынесен в `src/lib/core/`, build-модули — в `src/lib/modules/`, низкоуровневая логика — в `src/lib/` (`disk.sh`, `bootstrap.sh`, `log.sh`, `colors.sh`, `qemu.sh`). `scripts/package.sh` упаковывает исходники в один Bash-файл, embedded-встраивает active `src/conf/` assets и значения локального `build.conf`, затем создает `dist/images/` для образов. Каталог `dist/` является generated output и не коммитится. `build.conf.example` в корне хранит шаблон, а `build.conf` является ignored локальным config; package падает, если `build.conf` отсутствует. Значения `build.conf` становятся default config внутри packaged builder; внешний конфиг используется только при явном `--config PATH`. Конфиги исходников лежат в `src/conf/`: `src/conf/pacman/` для active pacman-конфига, `src/conf/boot/` для active boot-файлов, `src/conf/systemd/` для active first-boot unit. В текущем build path реально используются embedded defaults из `build.conf`, `src/conf/pacman/pacman-arm.conf`, `src/conf/boot/cmdline.txt`, `src/conf/boot/config.txt` и `src/conf/systemd/rpi5-firstboot.service`. Артефакты сборки, такие как `dist/images/archlinux-rpi5-aarch64.img`, не должны попадать в коммиты.
+## Project Overview
+Bash-скрипты для сборки Arch Linux ARM образа под Raspberry Pi 5. Один бинарник (`dist/bin/rpi5-archlinux-image`) умеет:
+- `build` — собрать img для RPi5
+- `build-qemu` — собрать img для QEMU (тестирование на x86_64)
+- `qemu-run` — запустить QEMU с собранным образом
+- `validate` — проверить build.conf
+- `list-steps` — показать pipeline сборки
 
-## Build, Test, and Development Commands
-После изменения исходников запускайте `cp build.conf.example build.conf`, если локального `build.conf` еще нет, затем `./scripts/package.sh`, чтобы обновить `dist/bin/rpi5-archlinux-image`. Запускайте основной сценарий командой `./dist/bin/rpi5-archlinux-image build`; он создает и настраивает `dist/images/archlinux-rpi5-aarch64.img` и сам повышает права через `sudo` только для привилегированных команд. Для QEMU smoke-сборки используйте `./dist/bin/rpi5-archlinux-image build-qemu`, а для запуска `./dist/bin/rpi5-archlinux-image qemu-run`. Для инспекции используйте `./dist/bin/rpi5-archlinux-image list-steps`, для проверки конфигурации — `./dist/bin/rpi5-archlinux-image validate`. Перед коммитом выполняйте `bash -n scripts/*.sh src/main.sh src/lib/*.sh src/lib/core/*.sh src/lib/modules/*.sh tests/*.sh` для быстрой проверки синтаксиса всех поддерживаемых shell-файлов. Если установлен `shellcheck`, запускайте `shellcheck scripts/*.sh src/main.sh src/lib/*.sh src/lib/core/*.sh src/lib/modules/*.sh tests/*.sh`, чтобы поймать проблемы с quoting, `source` и переносимостью. Релизный workflow публикует `archlinux-rpi5-aarch64.img.xz`, а не сырые `.img`, из-за лимита GitHub Release на размер asset, и собирает образы напрямую на native `ubuntu-24.04-arm` runner без собственного builder-контейнера. Проверять итоговый Pi образ удобно стандартными системными утилитами, например `losetup -fP dist/images/archlinux-rpi5-aarch64.img` и `mount`; QEMU образ проверяется через `qemu-system-aarch64 -M virt` командой `qemu-run`.
+## Key Architecture Decisions (2026-05-26)
+- **firstboot**: systemd-firstboot (интерактивный, tty) + rpi5-firstboot.service (useradd)
+- **root**: UUID-based (не /dev/mmcblk0p2)
+- **filesystem**: EXT4 (Bcachefs отложен — удален из mainline, медленный, баги на aarch64)
+- **kernel**: linux-rpi-16k (16K pages), Pi 5 auto-detects
+- **governor**: schedutil (EAS-aware для big.LITTLE)
+- **packages**: 40+ утилит (git, vim, tmux, fail2ban, s-tui, stress-ng, nvme-cli, etc.)
+- **overclock**: arm_freq=2800, over_voltage_delta=25000 в config.txt
+- **cmdline**: quiet loglevel=3 mitigations=off nowatchdog
+- **CI**: shell-checks на x86 (всегда) + build-arm на ARM runner (только ветка `dev`)
+- **release**: native ubuntu-24.04-arm, публикует .img.xz + os_list.json (для Network Install)
 
-## Coding Style & Naming Conventions
-Пишите Bash-скрипты с `#!/bin/bash`, `set -e` и `set -o pipefail`, если скрипт оркестрирует системные изменения. Придерживайтесь текущего стиля: отступ 4 пробела, глобальные конфигурационные переменные в `readonly` и верхнем регистре, функции с namespace, например `disk::create_image` и `bootstrap::install_base`. Имена файлов держите в нижнем регистре с суффиксом `.sh`. Вместо обычного `echo` предпочитайте явное логирование через `log::info`, `log::warn` и `log::die`.
+## File Map (для быстрой навигации)
 
-## Testing Guidelines
-Формального тестового фреймворка пока нет, поэтому проверка сейчас в основном shell-based и ручная. Минимум — прогонять `bash -n`, запускать smoke-проверки из `tests/`, запускать `./scripts/package.sh`, запускать `./dist/bin/rpi5-archlinux-image validate` и валидировать workflow YAML. Проверять измененный build path нужно через `./dist/bin/rpi5-archlinux-image build` или соответствующий GitHub Actions workflow. Build-time настройка должна по возможности избегать `arch-chroot`; предпочтительны `systemd-firstboot`, прямые file writes и first-boot service. При изменении `src/conf/` учитывайте, что эти файлы являются active assets, embedded-встраиваются в packaged builder и реально используются при сборке. Ручную валидацию фиксируйте в описании PR.
+| Path | Role |
+|------|------|
+| `src/main.sh` | CLI entrypoint |
+| `src/lib/core/config.sh` | Загрузка + валидация build.conf |
+| `src/lib/core/runner.sh` | Оркестрация шагов сборки |
+| `src/lib/core/steps.sh` | Реестр шагов (steps::add) |
+| `src/lib/core/modules.sh` | Загрузка build-модулей |
+| `src/lib/core/assets.sh` | Embedded assets (src/conf/ → heredoc) |
+| `src/lib/bootstrap.sh` | Вся in-target настройка (firstboot, fstab, mkinitcpio, network, sshd) |
+| `src/lib/disk.sh` | Loop-устройства, разделы, форматирование |
+| `src/lib/modules/disk_image.sh` | Шаги: create → map → partition → format → mount |
+| `src/lib/modules/base_system.sh` | pacstrap + mkinitcpio + fstab |
+| `src/lib/modules/boot_config.sh` | cmdline.txt + config.txt |
+| `src/lib/modules/services.sh` | network, sshd, fail2ban, ZRAM, Wi-Fi, EEPROM |
+| `src/conf/boot/config.txt` | Статический Pi-конфиг (overclock, GPU, boot) |
+| `src/conf/boot/cmdline.txt` | Kernel command line (шаблон с __ROOT_UUID__) |
+| `src/conf/systemd/rpi5-firstboot.service` | First-boot unit (user creation) |
+| `src/conf/systemd/systemd-firstboot.service.d/prompt.conf` | tty drop-in для интерактивных промптов |
+| `src/conf/pacman/pacman-arm.conf` | Pacman-конфиг для pacstrap |
+| `build.conf.example` | Шаблон конфига сборки |
+| `scripts/package.sh` | Упаковщик в один файл |
+| `tests/` | 13 shell-тестов |
+| `os_list.json` | Запись для Raspberry Pi Imager Network Install |
+| `TODO.md` | План дальнейших улучшений |
+| `IMPROVEMENTS.md` | История выполненных правок |
 
-## Commit & Pull Request Guidelines
-Текущая история использует короткие заголовки в повелительном наклонении (`Initial commit`). Сохраняйте commit message краткими и ориентированными на действие, например `Fix loop device cleanup` или `Update pacstrap package list`. В pull request описывайте изменение в процессе сборки образа, перечисляйте команды для проверки и отдельно отмечайте требования к хосту, потенциально опасные операции с дисками и любые изменения, влияющие на загрузку Raspberry Pi.
+## Build Pipeline (12 шагов)
+```
+prepare_image → map_loop → partition_image → create_filesystems → mount_filesystems
+→ prepare_base_config → install_base (pacstrap + mkinitcpio + fstab)
+→ configure_boot (cmdline.txt + config.txt) → configure_system (firstboot + locale)
+→ configure_services (network, sshd, fail2ban, etc.) → validate_boot_files → shrink_image
+```
 
-## Security & Configuration Tips
-Эти скрипты предполагают root-права и работают с loop-устройствами, mount-операциями и boot-конфигурацией. Не хардкодьте реальные учетные данные; значения по умолчанию, включая временные пароли, допустимы только для разработки и должны быть заменены перед использованием образа.
+## Quick Start для LLM
+```bash
+cp build.conf.example build.conf
+./scripts/package.sh
+bash -n src/lib/*.sh src/lib/core/*.sh src/lib/modules/*.sh tests/*.sh
+for t in tests/*.sh; do bash "$t" || echo "FAIL: $t"; done
+./dist/bin/rpi5-archlinux-image validate
+```
+
+## Пуш в dev (триггерит ARM-сборку в CI)
+```bash
+git branch -f dev main && git push origin dev --force
+```
