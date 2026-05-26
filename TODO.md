@@ -1,283 +1,205 @@
-# TODO — План работ по улучшению rpi5-archlinux-image
+# TODO — Этап: производительность и расширенные настройки
 
-> Версия: 2026-05-26, на основе `IMPROVEMENTS.md` и обсуждения
-
----
-
-## Этап 1: Безопасность (Issue #4 + #1)
-
-### 1.1 Убрать пароли из heredoc
-
-**Сейчас:** пароль пользователя зашит в теле `firstboot.sh` открытым текстом, виден в `ps aux`.
-
-**Решение:**
-- Root-пароль уже задается через `systemd-firstboot --root-password="$BUILD_ROOT_PASSWORD"`
-- Пользователь создается через `useradd`, пароль **не задается** — вместо этого `chage -d 0` обязывает сменить при первом логине
-- `build.conf.example`: убрать `BUILD_USER_PASSWORD`, добавить комментарий
-
-**Файлы:** `src/lib/bootstrap.sh` (функция `firstboot_service`), `build.conf.example`
-
-### 1.2 SigLevel + HTTPS-зеркала
-
-**Сейчас:** `SigLevel = Never`, зеркала HTTP.
-
-**Решение:**
-1. Заменить `http://` → `https://` в `src/conf/pacman/pacman-arm.conf`
-2. `SigLevel = Required DatabaseOptional`
-3. Перед `pacstrap` выполнить:
-   ```bash
-   pacman-key --init --root "$target"
-   pacman-key --populate archlinuxarm --root "$target"
-   ```
-
-**Файлы:** `src/conf/pacman/pacman-arm.conf`, `src/lib/bootstrap.sh`
+> На основе NEXT.md, обсуждения и исследования
 
 ---
 
-## Этап 2: Пакеты
+## 1. Bcachefs (отложен)
 
-### 2.1 Добавить в `BUILD_PACKAGES`
+**Статус:** ⏸️ Отложен до стабилизации в mainline
 
-| Пакет | Зачем |
-|-------|-------|
-| `i2c-tools` | Отладка I2C (GPIO, HAT-ы) |
-| `cpupower` | Управление CPU governor |
-| `rng-tools` | Питание entropy-пула от HW RNG |
-| `iptables-nft` | Базовый фаервол |
-| `git` | Нужен всем |
-| `man-db` `man-pages` | Man-страницы |
-| `vim` | Редактор |
-| `htop` | Мониторинг |
-| `logrotate` | Ротация логов |
-| `bash-completion` | Автодополнение |
-| `tmux` | Терминальный мультиплексор |
-| `wpa_supplicant` | Wi-Fi (на будущее) |
-| `fail2ban` | Защита SSH |
-| `avahi` | mDNS (.local-доступ) |
+**Причина:** модуль `bcachefs` удален из дерева ядра в Linux 6.18 как экспериментальный. Для работы требуется `bcachefs-dkms` (AUR) + `linux-rpi-16k-headers` + компиляция модуля через DKMS при каждом обновлении ядра. Это усложняет сборку и загрузку.
 
-**Файлы:** `build.conf.example`
+**План на будущее:**
+- Когда bcachefs вернется в mainline — добавить опцию `BUILD_ROOT_FS="bcachefs"`
+- Нужен будет отдельный `/boot` (vfat) + root (bcachefs)
+- Снапшоты: `bcachefs subvolume snapshot`
+- Хук `bcachefs` в mkinitcpio
 
 ---
 
-## Этап 3: Конфигурация системы
+## 2. Разгон CPU/GPU → `build.conf`
 
-### 3.1 CPU Governor — `schedutil`
-
-RPi5 big.LITTLE (4×A76 + 4×A55). `schedutil` — EAS-aware, экономит энергию без потери производительности.
+### 2.1 Параметры
 
 ```bash
-# /etc/tmpfiles.d/cpu-governor.conf
-w /sys/devices/system/cpu/cpufreq/policy0/scaling_governor - - - - schedutil
-w /sys/devices/system/cpu/cpufreq/policy4/scaling_governor - - - - schedutil
+# CPU frequency: 2400 (stock), 2800 (safe), 3000 (max, needs cooling)
+BUILD_ARM_FREQ=2800
+# GPU 3D frequency: 960 (stock), 1000 (safe)
+BUILD_V3D_FREQ=960
+# Core frequency: 910 (stock)
+BUILD_CORE_FREQ=910
+# Voltage offset in microvolts: 0 (stock), 20000-50000
+BUILD_OVER_VOLTAGE_DELTA=20000
+# Force turbo (keeps max freq, enables higher voltages): 0 or 1
+BUILD_FORCE_TURBO=0
 ```
 
-**Файлы:** `src/lib/bootstrap.sh` (новая функция или расширение `cpu_boost`)
+### 2.2 Генерация config.txt
 
-### 3.2 ZRAM — опционально
-
-Сейчас жестко отключен через `disable_swap`. Добавить опцию:
-
-```bash
-# build.conf
-BUILD_ENABLE_ZRAM=0   # 1 = включить systemd-zram-generator
-```
-
-При `BUILD_ENABLE_ZRAM=1` — не вызывать `disable_swap`, вместо этого:
-```bash
-cat <<EOF >"$target/etc/systemd/zram-generator.conf"
-[zram0]
-zram-size = ram / 2
-compression-algorithm = zstd
-EOF
-```
-
-**Файлы:** `build.conf.example`, `src/lib/bootstrap.sh`, `src/lib/modules/services.sh`
-
-### 3.3 SSH hardening
-
-```bash
-echo "PermitRootLogin no" >> "$target/etc/ssh/sshd_config"
-echo "PasswordAuthentication yes" >> "$target/etc/ssh/sshd_config"  # пока не настроены ключи
-```
-
-**Файлы:** `src/lib/bootstrap.sh` (`bootstrap::sshd`)
-
-### 3.4 mDNS через systemd-resolved (без avahi-демона)
-
-В существующий `20-wired.network` добавить `MulticastDNS=yes`:
+В секцию `[pi5]` config.txt добавляются **только заданные** параметры:
 ```ini
-[Network]
-DHCP=yes
-MulticastDNS=yes
+arm_freq=2800
+over_voltage_delta=20000
 ```
 
-И в `/etc/systemd/resolved.conf`:
-```ini
-[Resolve]
-MulticastDNS=yes
-```
+Динамическая частота (`schedutil`) уже настроена в `cpu-power.conf`.
 
-Пакет `avahi` не нужен — `systemd-resolved` сам регистрирует `arch-rpi5.local`.
+### 2.3 Файлы
 
-**Файлы:** `src/lib/bootstrap.sh` (`bootstrap::network`)
-
-### 3.5 fail2ban — настройка
-
-Шаблон в `src/conf/fail2ban/sshd.conf`:
-```ini
-[sshd]
-enabled = true
-port = ssh
-maxretry = 3
-bantime = 3600
-findtime = 600
-```
-
-Сервис включается при сборке:
-```bash
-bootstrap::systemd_enable_unit "$target" "fail2ban.service" "multi-user.target.wants"
-```
-
-**Файлы:** `src/conf/fail2ban/sshd.conf` (новый), `src/lib/modules/services.sh`, `src/lib/bootstrap.sh`
-
-### 3.6 wpa_supplicant — предварительная настройка без привязки к сети
-
-Добавить `wpa_supplicant` в пакеты. Сервис **не включать** по умолчанию. Добавить опцию:
-```bash
-BUILD_ENABLE_WIFI=0
-```
-
-При `BUILD_ENABLE_WIFI=1`:
-- Включить `wpa_supplicant@wlan0.service`
-- Добавить конфиг `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` (пустой, с комментарием)
-- Убрать `dtoverlay=disable-wifi` из `config.txt`
-
-**Файлы:** `build.conf.example`, `src/lib/bootstrap.sh`
+- `build.conf.example` — новые переменные
+- `src/lib/bootstrap.sh` — `bootstrap::config_txt()` или `bootstrap::overclock_config()`
+- `src/conf/boot/config.txt` — убрать частоты (будут из конфига)
 
 ---
 
-## Этап 4: Рефакторинг firstboot
+## 3. Два профиля cmdline.txt
 
-### 4.1 `ConditionFirstBoot=yes`
+### 3.1 Переменная
 
-Заменить ручной `systemctl disable` + `rm -f` на нативный механизм systemd:
-
-```ini
-# rpi5-firstboot.service
-[Unit]
-ConditionFirstBoot=yes    # systemd сам пропустит после первого выполнения
-```
-
-Убрать из `firstboot.sh`:
 ```bash
-systemctl disable rpi5-firstboot.service
-rm -f /etc/systemd/system/multi-user.target.wants/rpi5-firstboot.service
+# "prod" — тихая загрузка (только warn/crit), "debug" — подробный лог
+BUILD_BOOT_PROFILE="debug"
 ```
 
-### 4.2 `firstboot.sh` → минимальный
+### 3.2 Профиль `debug`
 
-После замены самодеактивации и паролей, `firstboot.sh` сводится к:
-```bash
-#!/bin/bash
-set -euo pipefail
-
-# Создание пользователя (если еще нет)
-if ! id -u "$BUILD_USER_NAME" >/dev/null 2>&1; then
-    useradd -m -G wheel "$BUILD_USER_NAME"
-    chage -d 0 "$BUILD_USER_NAME"   # смена пароля при первом логине
-fi
-
-# Локали
-locale-gen >/dev/null
-
-# Расширение раздела
-if command -v systemd-repart >/dev/null 2>&1; then
-    systemd-repart --dry-run=no
-fi
-systemctl restart systemd-growfs-root.service || true
+```
+root=UUID=... rw rootwait console=tty1 fsck.repair=yes
 ```
 
-### 4.3 Выделить `firstboot.sh` в `src/conf/`
+### 3.3 Профиль `prod`
 
-Сейчас формируется heredoc'ом. Вынести в `src/conf/firstboot/rpi5-firstboot.sh` и копировать через `assets::write`.
+```
+root=UUID=... rw rootwait console=tty1 fsck.repair=yes quiet loglevel=3 mitigations=off nowatchdog
+```
 
-**Файлы:** `src/conf/systemd/rpi5-firstboot.service`, `src/conf/firstboot/rpi5-firstboot.sh` (новый), `src/lib/bootstrap.sh`
+### 3.4 Дополнительные параметры (обсуждаемы)
+
+| Параметр | Эффект | Рекомендация |
+|----------|--------|--------------|
+| `mitigations=off` | +5-10% CPU perf, Pi 5 не подвержен Spectre/Meltdown | ✅ prod |
+| `nowatchdog` | Отключает hardware watchdog, +perf | ✅ prod |
+| `quiet` | Меньше логов на консоли | ✅ prod |
+| `loglevel=3` | Только ошибки и критические | ✅ prod |
+| `zswap.enabled=1` | Сжатие swap в RAM | ⚠️ только с ZRAM |
+
+### 3.5 Файлы
+
+- `build.conf.example` — `BUILD_BOOT_PROFILE`
+- `src/lib/bootstrap.sh` — `bootstrap::cmdline_txt()`
+- `src/conf/boot/cmdline.txt` — шаблон с плейсхолдерами
 
 ---
 
-## Этап 5: Репозиторий и CI
+## 4. `config.txt` → `build.conf`
 
-### 5.1 Тесты
+### 4.1 Параметры
 
-| Тест | Что проверяет |
-|------|---------------|
-| `cmdline_uuid_test.sh` | Подстановка `__ROOT_UUID__` в `bootstrap::cmdline_txt` |
-| `sudoers_test.sh` | `bootstrap::enable_wheel_sudo` — раскомментирование `%wheel` |
-| `custom_unit_test.sh` | `bootstrap::systemd_enable_custom_unit` — симлинк в `/etc/systemd/system/` |
-
-### 5.2 CI
-
-- Добавить `deps::validate_build_commands` в CI-пайплайн
-- Убрать глобальный `shellcheck disable=SC2034`, заменить на целевые директивы
-
-### 5.3 README
-
-Добавить секции:
-- NVMe-загрузка (EEPROM `BOOT_ORDER`)
-- Смена паролей при первом логине
-- `--config PATH` для кастомных настроек
-
-### 5.4 `build.conf.example`
-
-Новые опции:
 ```bash
-BUILD_ENABLE_ZRAM=0
-BUILD_ENABLE_WIFI=0
-BUILD_CPU_GOVERNOR="schedutil"   # schedutil | ondemand | performance
-BUILD_FAIL2BAN_MAXRETRY=3
-BUILD_FAIL2BAN_BANTIME=3600
-BUILD_USER_PASSWORD=""           # оставить пустым — пользователь сменит при первом логине
+# CPU
+BUILD_CONFIG_ARM_BOOST=1          # 2.4 GHz boost (recommended)
+BUILD_CONFIG_ARM_64BIT=1          # 64-bit kernel
+# GPU
+BUILD_CONFIG_VC4_KMS_V3D=1        # DRM graphics driver
+BUILD_CONFIG_MAX_FRAMEBUFFERS=2   # dual display support
+BUILD_CONFIG_DISABLE_OVERSCAN=1   # no overscan
+BUILD_CONFIG_DISABLE_FW_KMS=1     # prefer KMS over firmware
+# Connectivity
+BUILD_CONFIG_DISABLE_WIFI=1       # disable onboard Wi-Fi
+BUILD_CONFIG_DISABLE_BT=1         # disable onboard Bluetooth
+BUILD_CONFIG_DT_PARAM_AUDIO=1     # onboard audio
+# PCIe / NVMe
+BUILD_CONFIG_PCIE_GEN=3           # 2 or 3
+# Camera / Display
+BUILD_CONFIG_CAMERA_AUTO=0
+BUILD_CONFIG_DISPLAY_AUTO=0
+# Overclocking (from section 2)
+BUILD_ARM_FREQ=2800
+BUILD_V3D_FREQ=960
+BUILD_CORE_FREQ=910
+BUILD_OVER_VOLTAGE_DELTA=20000
+BUILD_FORCE_TURBO=0
 ```
+
+### 4.2 Генерация config.txt
+
+`bootstrap::config_txt()` собирает `config.txt` динамически из заданных параметров:
+- Базовая структура ([pi5], [all]) — в коде
+- Параметры подставляются через heredoc с условиями
+
+### 4.3 Файлы
+
+- `build.conf.example` — все переменные
+- `src/lib/bootstrap.sh` — логика генерации
+- `src/conf/boot/config.txt` — удалить (генерируется динамически)
 
 ---
 
-## Этап 6: Документация
+## 5. `rpi5-eeprom` + `flashrom`
 
-- [ ] `IMPROVEMENTS.md` → обновить после реализации
-- [ ] `README.md` → дополнить секциями про NVMe, пароли, `--config`
-- [ ] Закрыть issues #1, #4 после реализации
+### 5.1 Пакеты
+
+- `rpi5-eeprom` — из репозитория `alarm` (Arch Linux ARM), содержит прошивки EEPROM для BCM2712
+- `flashrom` — опционально, для обновления прошивки
+
+### 5.2 Переменная в build.conf
+
+```bash
+# Канал обновлений EEPROM: "default" (стабильный), "latest" (новейший)
+BUILD_EEPROM_CHANNEL="default"
+```
+
+### 5.3 Настройка при сборке
+
+```bash
+# Установить конфиг для rpi-eeprom-update
+echo "FIRMWARE_RELEASE_STATUS=\"$BUILD_EEPROM_CHANNEL\"" > "$target/etc/default/rpi-eeprom-update"
+```
+
+### 5.4 Файлы
+
+- `build.conf.example` — `BUILD_EEPROM_CHANNEL`
+- `src/lib/modules/services.sh` — настройка
+
+---
+
+## 6. Новая утилита: `nvme-cli`
+
+Для NVMe-дисков: мониторинг SMART, прошивка, форматирование.
+
+**Статус:** добавить в `BUILD_PACKAGES`, `build.conf.example`, `bootstrap.sh`.
+
+---
+
+## 7. Из официальной документации `config.txt`
+
+### 7.1 Параметры, которые стоит рассмотреть
+
+| Параметр | Эффект | Рекомендация |
+|----------|--------|--------------|
+| `kernel=kernel_2712.img` | 16K-оптимизированное ядро для Pi 5 | ✅ вместо `kernel8.img` |
+| `boot_ramdisk=1` | Загрузка boot.img для secure-boot | ⚠️ опционально |
+| `os_check=0` | Отключает проверку совместимости DTB | ❌ для dev, ✅ для prod |
+| `DISABLE_HDMI=1` | Отключает HDMI-диагностику | ✅ headless (prod) |
+| `kernel_watchdog_timeout=30` | Hardware watchdog на 30 сек | ⚠️ для серверов |
+| `disable_splash=1` | Отключает rainbow screen | ✅ prod |
+| `bootloader_update=0` | Блокирует самообновление bootloader | ❌ для prod |
+
+### 7.2 `kernel_2712.img`
+
+Pi 5 firmware по умолчанию ищет `kernel_2712.img` (16K pages) и fallback на `kernel8.img`. `linux-rpi-16k` должен предоставлять `kernel_2712.img`. Переключиться на него вместо `kernel8.img`.
 
 ---
 
 ## Порядок выполнения
 
-| Этап | Приоритет | Зависимости |
-|------|-----------|-------------|
-| 1.1 Пароли | ✅ DONE | `d41b320` |
-| 1.2 HTTPS + SigLevel | ⚠️ PARTIAL (HTTPS fails, SigLevel=Never kept for build) | `d41b320` |
-| 2.1 Пакеты | ✅ DONE | `1b59441` |
-| 3.1 schedutil | ✅ DONE | `5752d41` |
-| 3.2 ZRAM опционально | ✅ DONE | `5752d41` |
-| 3.3 SSH hardening | ✅ DONE | `5752d41` |
-| 3.4 mDNS | ✅ DONE | `5752d41` |
-| 3.5 fail2ban | ✅ DONE | `5752d41` |
-| 3.6 wpa_supplicant | ✅ DONE | `5752d41` |
-| 4.1 ConditionFirstBoot | ✅ DONE | `81cfb2e` |
-| 4.2-4.3 Рефакторинг | ✅ DONE (heredoc kept, ConditionFirstBoot added) | `81cfb2e` |
-| 5.1 Тесты | 🟢 LOW | этапы 1-4 |
-| 5.2-5.4 CI/README/Config | 🟢 LOW | нет |
-| 6 Документация | 🟢 LOW | все этапы |
-
----
-
-## Про rmux
-
-Проект `rmux` мне неизвестен. Возможно, ты имеешь в виду `zellij` (Rust, современный аналог tmux) или другой инструмент?
-
-Аргументы за `tmux`:
-- В официальных репах Arch (`pacman -S tmux`)
-- 2 MB, стабилен, предсказуем
-- Знаком 100% аудитории
-- Не требует runtime-зависимостей (типа Rust-рантайма)
-
-Любой не-tmux мультиплексор пользователь поставит сам, если захочет. В базовом образе достаточно `tmux`. Если знаешь конкретный `rmux` — скинь ссылку, посмотрю.
+| # | Задача | Приоритет | Зависимости |
+|---|--------|-----------|-------------|
+| 1 | `rpi5-eeprom` в пакеты + настройка канала | 🔴 HIGH | нет |
+| 2 | `nvme-cli` в пакеты | 🔴 HIGH | нет |
+| 3 | config.txt → build.conf (вынос параметров) | 🟡 MEDIUM | нет |
+| 4 | kernel_2712.img вместо kernel8.img | 🟡 MEDIUM | нет |
+| 5 | Разгон CPU/GPU в build.conf | 🟡 MEDIUM | п.3 |
+| 6 | Два профиля cmdline.txt (debug/prod) | 🟡 MEDIUM | нет |
+| 7 | Bcachefs | ⏸️ Отложен | ждать mainline |
