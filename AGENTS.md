@@ -49,6 +49,10 @@ for t in tests/*.sh; do bash "$t" || echo "FAIL: $t"; done
    ```bash
    git branch -f dev main && git push origin dev --force
    ```
+6. **Релиз:** когда пользователь говорит «релиз» или «выпускаем» — мерж `dev` → `main`, тег `v*`, пуш:
+   ```bash
+   git checkout main && git merge dev && git tag v0.4.0 && git push origin main --tags
+   ```
 
 ## CI/CD
 
