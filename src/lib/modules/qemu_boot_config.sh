@@ -52,6 +52,7 @@ qemu_boot_config::export_boot_artifacts() {
         qemu_cmdline="$qemu_cmdline rootflags=$BUILD_QEMU_ROOTFLAGS"
     fi
     printf '%s\n' "$qemu_cmdline" >"$BUILD_QEMU_BOOT_DIR/cmdline.txt"
+    BUILD_QEMU_KERNEL_CMDLINE="$qemu_cmdline"
 }
 
 qemu_boot_config::finalize_artifact_permissions() {

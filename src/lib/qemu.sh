@@ -24,6 +24,10 @@ qemu::validate_artifacts() {
 }
 
 qemu::command() {
+    local qemu_cmdline="$BUILD_QEMU_KERNEL_CMDLINE"
+    if [[ -n "${BUILD_QEMU_ROOTFLAGS:-}" ]]; then
+        qemu_cmdline="$qemu_cmdline rootflags=$BUILD_QEMU_ROOTFLAGS"
+    fi
     printf 'qemu-system-aarch64'
     printf ' %q' \
         -M virt \
@@ -33,7 +37,7 @@ qemu::command() {
         -nographic \
         -kernel "$(qemu::kernel_path)" \
         -initrd "$(qemu::initramfs_path)" \
-        -append "$BUILD_QEMU_KERNEL_CMDLINE" \
+        -append "$qemu_cmdline" \
         -drive "file=$BUILD_IMAGE_PATH,format=raw,if=virtio" \
         -netdev "user,id=net0,hostfwd=tcp::$BUILD_QEMU_SSH_HOST_PORT-:22" \
         -device "virtio-net-pci,netdev=net0"

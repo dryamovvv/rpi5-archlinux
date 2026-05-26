@@ -434,7 +434,32 @@ bootstrap::btrfs_setup_snapper() {
     fi
     rmdir "$snap_mount" 2>/dev/null || true
 
-    arch-chroot "$target" snapper -c root create-config /
+    mkdir -p "$target/etc/snapper/configs"
+    cat >"$target/etc/snapper/configs/root" <<'SNAPCONF'
+SUBVOLUME="/"
+FSTYPE="btrfs"
+QGROUP=""
+SPACE_LIMIT="0.5"
+FREE_LIMIT="0.2"
+ALLOW_USERS=""
+ALLOW_GROUPS=""
+SYNC_ACL="no"
+BACKGROUND_COMPARISON="yes"
+NUMBER_CLEANUP="yes"
+NUMBER_MIN_AGE="1800"
+NUMBER_LIMIT="50"
+NUMBER_LIMIT_IMPORTANT="10"
+TIMELINE_CREATE="yes"
+TIMELINE_CLEANUP="yes"
+TIMELINE_MIN_AGE="1800"
+TIMELINE_LIMIT_HOURLY="5"
+TIMELINE_LIMIT_DAILY="7"
+TIMELINE_LIMIT_WEEKLY="4"
+TIMELINE_LIMIT_MONTHLY="3"
+TIMELINE_LIMIT_YEARLY="2"
+EMPTY_PRE_POST_CLEANUP="yes"
+EMPTY_PRE_POST_MIN_AGE="1800"
+SNAPCONF
 
     if btrfs subvolume delete "$target/.snapshots" >/dev/null 2>&1; then
         log::info "Удален вложенный .snapshots subvolume внутри @"
@@ -446,14 +471,6 @@ bootstrap::btrfs_setup_snapper() {
 
     bootstrap::systemd_enable_unit "$target" "snapper-timeline.timer" "timers.target.wants"
     bootstrap::systemd_enable_unit "$target" "snapper-cleanup.timer" "timers.target.wants"
-
-    arch-chroot "$target" snapper -c root set-config "TIMELINE_CREATE=yes"
-    arch-chroot "$target" snapper -c root set-config "TIMELINE_CLEANUP=yes"
-    arch-chroot "$target" snapper -c root set-config "TIMELINE_LIMIT_HOURLY=5"
-    arch-chroot "$target" snapper -c root set-config "TIMELINE_LIMIT_DAILY=7"
-    arch-chroot "$target" snapper -c root set-config "TIMELINE_LIMIT_WEEKLY=4"
-    arch-chroot "$target" snapper -c root set-config "TIMELINE_LIMIT_MONTHLY=3"
-    arch-chroot "$target" snapper -c root set-config "TIMELINE_LIMIT_YEARLY=2"
 
     log::success "Snapper настроен"
 }

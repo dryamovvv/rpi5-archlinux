@@ -68,6 +68,10 @@ config::select_qemu() {
       "openssh"
     )
   fi
+
+  if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
+    BUILD_PACKAGES+=("btrfs-progs" "snapper" "snap-pac")
+  fi
 }
 
 config::validate() {
