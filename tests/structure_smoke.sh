@@ -35,10 +35,10 @@ grep -q '^build\.conf$' "$repo_root/.gitignore" || fail ".gitignore must exclude
 [[ -f "$repo_root/src/lib/modules/image_shrink.sh" ]] || fail "missing image shrink module"
 grep -q 'Complete first boot provisioning' "$repo_root/src/conf/systemd/rpi5-firstboot.service" ||
   fail "firstboot service asset must be non-empty and active"
-grep -q 'systemd-repart.service' "$repo_root/src/lib/modules/services.sh" ||
-  fail "services must enable native systemd-repart for root growth"
-grep -q 'systemd-growfs-root.service' "$repo_root/src/lib/modules/services.sh" ||
-  fail "firstboot provisioning must grow the root filesystem"
+grep -q 'systemd-repart.service' "$repo_root/src/lib/bootstrap.sh" ||
+  fail "resize_root must enable systemd-repart for root growth"
+grep -q 'systemd-growfs-root.service' "$repo_root/src/lib/bootstrap.sh" ||
+  fail "resize_root must enable systemd-growfs for root growth"
 if grep -Fq "bootstrap::zram \"\$BUILD_MOUNT_ROOT\"" "$repo_root/src/lib/modules/services.sh"; then
   fail "services must not enable zram"
 fi

@@ -388,34 +388,18 @@ bootstrap::resize_root() {
     local target="$1"
     log::assert_not_empty "$target" "точка монтирования"
 
-    if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
-        log::info "Создаем btrfs grow service..."
-        cat <<'EOF' >"$target/etc/systemd/system/btrfs-grow.service"
-[Unit]
-Description=Grow btrfs filesystem to fill partition
-After=local-fs.target
-Before=sysinit.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/btrfs filesystem resize max /
-RemainAfterExit=yes
-
-[Install]
-WantedBy=sysinit.target
-EOF
-        bootstrap::systemd_enable_custom_unit "$target" "btrfs-grow.service" "sysinit.target.wants"
-        return
-    fi
-
-    log::info "Вызовем репарт при первой загрузке"
+    log::info "Создаем repart drop-in для расширения раздела при первой загрузке"
     mkdir -p "$target/etc/repart.d"
     cat <<EOF >"$target/etc/repart.d/50-root.conf"
 [Partition]
 Type=root-arm64
 GrowFileSystem=yes
 EOF
-    bootstrap::systemd_enable_unit "$target" "systemd-growfs-root.service" "multi-user.target.wants"
+
+    bootstrap::systemd_enable_unit "$target" "systemd-repart.service" "sysinit.target.wants"
+    bootstrap::systemd_enable_unit "$target" "systemd-growfs-root.service" "sysinit.target.wants"
+
+    bootstrap::regenerate_initramfs "$target"
 }
 
 bootstrap::btrfs_setup_snapper() {

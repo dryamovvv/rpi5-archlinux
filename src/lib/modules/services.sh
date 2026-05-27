@@ -36,13 +36,11 @@ EOF
   bootstrap::cpu_boost "$BUILD_MOUNT_ROOT"
   bootstrap::wifi_regdom "$BUILD_MOUNT_ROOT"
 
+  bootstrap::resize_root "$BUILD_MOUNT_ROOT"
+
   if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
-    bootstrap::resize_root "$BUILD_MOUNT_ROOT"
     bootstrap::btrfs_setup_snapper "$BUILD_MOUNT_ROOT"
     bootstrap::btrfs_write_rollback_script "$BUILD_MOUNT_ROOT"
-  else
-    bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-repart.service" "sysinit.target.wants"
-    bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-growfs-root.service" "sysinit.target.wants"
   fi
 
   bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-firstboot.service" "sysinit.target.wants"
