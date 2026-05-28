@@ -34,8 +34,9 @@ BUILD_MKINITCPIO_COMPRESSION="gzip"
 BUILD_SHRINK_IMAGE=1
 # ZRAM compression: 0=disabled, 1=enabled via systemd-zram-generator
 BUILD_ENABLE_ZRAM=1
-# ZRAM size: use GB values like "2G" (zram-generator has issues with 4G on 16k kernels)
-BUILD_ZRAM_SIZE="2G"
+# ZRAM size: value in MEGABYTES (NOT with G suffix — fasteval treats G as 10^9, then *1024*1024 double-converts)
+# Use "4096" for 4 GiB, "2048" for 2 GiB, or expression like "min(ram / 2, 4096)"
+BUILD_ZRAM_SIZE="2048"
 # Swapfile on btrfs (secondary swap, ZRAM fills first): size like "16g" or "" to disable
 BUILD_SWAPFILE_SIZE="16G"
 # Wi-Fi support: 0=disabled, 1=enable wpa_supplicant and remove disable-wifi overlay

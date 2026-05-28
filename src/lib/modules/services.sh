@@ -24,7 +24,7 @@ services::configure_services() {
 
   if [[ "${BUILD_ENABLE_ZRAM:-0}" == "1" ]]; then
     assets::write "systemd/zram-generator.conf" "$BUILD_MOUNT_ROOT/etc/systemd/zram-generator.conf"
-    sed -i "s|__ZRAM_SIZE__|${BUILD_ZRAM_SIZE:-2G}|g" "$BUILD_MOUNT_ROOT/etc/systemd/zram-generator.conf"
+    sed -i "s|__ZRAM_SIZE__|${BUILD_ZRAM_SIZE:-2048}|g" "$BUILD_MOUNT_ROOT/etc/systemd/zram-generator.conf"
     log::info "ZRAM enabled (zram-generator configured)"
   else
     bootstrap::disable_swap "$BUILD_MOUNT_ROOT"
