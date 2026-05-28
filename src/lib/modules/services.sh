@@ -19,7 +19,7 @@ services::configure_system() {
 
 services::configure_services() {
   bootstrap::network "$BUILD_MOUNT_ROOT"
-  bootstrap::sshd "$BUILD_MOUNT_ROOT" "$BUILD_SSH_USER"
+  bootstrap::sshd "$BUILD_MOUNT_ROOT" "$BUILD_SSH_USER" "${BUILD_SSH_ALLOW_USERS:-}"
   bootstrap::enable_wheel_sudo "$BUILD_MOUNT_ROOT"
 
   if [[ "${BUILD_ENABLE_ZRAM:-0}" == "1" ]]; then

@@ -333,12 +333,12 @@ bootstrap::enable_wheel_sudo() {
 bootstrap::sshd() {
     local target="$1"
     local ssh_user="$2"
+    local extra_users="${3:-}"
     log::assert_not_empty "$target" "точка монтирования"
     log::assert_not_empty "$ssh_user" "пользователь ssh"
 
     log::info "Настраиваем sshd"
-    echo "AllowUsers $ssh_user" >>"$target/etc/ssh/sshd_config"
-    echo "PermitRootLogin no" >>"$target/etc/ssh/sshd_config"
+    echo "AllowUsers $ssh_user $extra_users" >>"$target/etc/ssh/sshd_config"
     bootstrap::systemd_enable_unit "$target" "sshd.service" "multi-user.target.wants"
 }
 
