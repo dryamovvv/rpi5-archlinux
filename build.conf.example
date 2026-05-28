@@ -32,7 +32,11 @@ BUILD_MKINITCPIO_COMPRESSION="gzip"
 # Image shrink after build: 1=shrink (default), 0=skip (faster dev builds)
 BUILD_SHRINK_IMAGE=1
 # ZRAM compression: 0=disabled, 1=enabled via systemd-zram-generator
-BUILD_ENABLE_ZRAM=0
+BUILD_ENABLE_ZRAM=1
+# ZRAM size: supports expressions like "ram / 2", "ram", "min(ram, 16384)", or fixed "4g"
+BUILD_ZRAM_SIZE="ram / 2"
+# Swapfile on btrfs (secondary swap, ZRAM fills first): size like "16g" or "" to disable
+BUILD_SWAPFILE_SIZE="16g"
 # Wi-Fi support: 0=disabled, 1=enable wpa_supplicant and remove disable-wifi overlay
 BUILD_ENABLE_WIFI=0
 
@@ -88,6 +92,11 @@ BUILD_PACKAGES=(
     "btrfs-progs"
     "snapper"
     "snap-pac"
+    "inetutils"
+    "which"
+    "pacman-contrib"
+    # ZRAM swap compression
+    "zram-generator"
 )
 
 # EEPROM update channel: "default" (stable) or "latest" (newer, +performance)
@@ -136,4 +145,6 @@ BUILD_QEMU_PACKAGES=(
     "btrfs-progs"
     "snapper"
     "snap-pac"
+    # ZRAM swap compression
+    "zram-generator"
 )

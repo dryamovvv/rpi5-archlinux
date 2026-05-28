@@ -23,11 +23,8 @@ services::configure_services() {
   bootstrap::enable_wheel_sudo "$BUILD_MOUNT_ROOT"
 
   if [[ "${BUILD_ENABLE_ZRAM:-0}" == "1" ]]; then
-    cat >"$BUILD_MOUNT_ROOT/etc/systemd/zram-generator.conf" <<'EOF'
-[zram0]
-zram-size = ram / 2
-compression-algorithm = zstd
-EOF
+    assets::write "systemd/zram-generator.conf" "$BUILD_MOUNT_ROOT/etc/systemd/zram-generator.conf"
+    sed -i "s/__ZRAM_SIZE__/${BUILD_ZRAM_SIZE:-ram \/ 2}/g" "$BUILD_MOUNT_ROOT/etc/systemd/zram-generator.conf"
     log::info "ZRAM enabled (zram-generator configured)"
   else
     bootstrap::disable_swap "$BUILD_MOUNT_ROOT"

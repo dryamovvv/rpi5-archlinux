@@ -104,4 +104,12 @@ config::validate() {
 
   ((${#BUILD_MODULES[@]} > 0)) || log::die "BUILD_MODULES must not be empty"
   ((${#BUILD_PACKAGES[@]} > 0)) || log::die "BUILD_PACKAGES must not be empty"
+
+  if [[ "${BUILD_ENABLE_ZRAM:-0}" == "1" ]] && [[ -z "${BUILD_ZRAM_SIZE:-}" ]]; then
+    log::warn "BUILD_ZRAM_SIZE is empty, zram-generator will use default"
+  fi
+
+  if [[ -n "${BUILD_SWAPFILE_SIZE:-}" ]] && ! [[ "$BUILD_SWAPFILE_SIZE" =~ ^[0-9]+[gGmMkK]?$ ]]; then
+    log::die "BUILD_SWAPFILE_SIZE must be a valid size (e.g. 16g, 2g, 512m)"
+  fi
 }

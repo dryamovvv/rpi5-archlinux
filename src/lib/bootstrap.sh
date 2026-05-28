@@ -206,16 +206,10 @@ bootstrap::firstboot_service() {
     log::assert_not_empty "$target" "точка монтирования"
     log::assert_not_empty "$user_name" "имя пользователя"
 
-    mkdir -p "$target/usr/local/lib/rpi5-archlinux" "$target/etc/systemd/system"
-    cat <<FIRSTBOOTSCRIPT >"$target/usr/local/lib/rpi5-archlinux/firstboot.sh"
-#!/bin/bash
-set -euo pipefail
-
-if ! id -u "$user_name" >/dev/null 2>&1; then
-    useradd -m -G wheel "$user_name"
-    chage -d 0 "$user_name"
-fi
-FIRSTBOOTSCRIPT
+    mkdir -p "$target/usr/local/lib/rpi5-archlinux"
+    assets::write "systemd/firstboot.sh" "$target/usr/local/lib/rpi5-archlinux/firstboot.sh"
+    sed -i "s/__USER_NAME__/$user_name/g" "$target/usr/local/lib/rpi5-archlinux/firstboot.sh"
+    sed -i "s/__SWAPFILE_SIZE__/${BUILD_SWAPFILE_SIZE:-}/g" "$target/usr/local/lib/rpi5-archlinux/firstboot.sh"
     chmod 0755 "$target/usr/local/lib/rpi5-archlinux/firstboot.sh"
 
     # systemd-firstboot drop-in for interactive tty prompts
