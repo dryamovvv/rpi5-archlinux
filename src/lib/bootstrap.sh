@@ -325,8 +325,9 @@ bootstrap::enable_wheel_sudo() {
     local target="$1"
     log::assert_not_empty "$target" "точка монтирования"
 
-    log::info "Раскомментируем %wheel в /etc/sudoers..."
-    sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' "$target/etc/sudoers"
+    log::info "Добавляем %wheel в /etc/sudoers.d/10-wheel..."
+    assets::write "sudoers.d/10-wheel" "$target/etc/sudoers.d/10-wheel"
+    chmod 440 "$target/etc/sudoers.d/10-wheel"
 }
 
 bootstrap::sshd() {

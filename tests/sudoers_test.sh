@@ -19,15 +19,21 @@ fail() {
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-echo '# %wheel ALL=(ALL:ALL) ALL' >"$TMPDIR/sudoers"
-sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' "$TMPDIR/sudoers"
+mkdir -p "$TMPDIR/etc/sudoers.d"
+echo '%wheel ALL=(ALL:ALL) ALL' >"$TMPDIR/etc/sudoers.d/10-wheel"
+chmod 440 "$TMPDIR/etc/sudoers.d/10-wheel"
 
-if grep -q '# %wheel' "$TMPDIR/sudoers"; then
-  fail "%wheel line is still commented"
+if [[ ! -f "$TMPDIR/etc/sudoers.d/10-wheel" ]]; then
+    fail "10-wheel file not created"
 fi
 
-if ! grep -q '%wheel ALL=(ALL:ALL) ALL' "$TMPDIR/sudoers"; then
-  fail "%wheel line not uncommented (got: $(cat "$TMPDIR/sudoers"))"
+if ! grep -q '%wheel ALL=(ALL:ALL) ALL' "$TMPDIR/etc/sudoers.d/10-wheel"; then
+    fail "wrong content in 10-wheel (got: $(cat "$TMPDIR/etc/sudoers.d/10-wheel"))"
 fi
 
-echo "PASS: sudoers wheel uncommented"
+perms=$(stat -c "%a" "$TMPDIR/etc/sudoers.d/10-wheel" 2>/dev/null || stat -f "%Lp" "$TMPDIR/etc/sudoers.d/10-wheel" 2>/dev/null)
+if [[ "$perms" != "440" ]]; then
+    fail "expected 440 permissions, got $perms"
+fi
+
+echo "PASS: sudoers drop-in created correctly"
