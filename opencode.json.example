@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "arch-linux": {
+      "type": "local",
+      "command": [
+        "ssh",
+        "root@__TARGET_HOST__",
+        "-p",
+        "__TARGET_SSH_PORT__",
+        "uvx",
+        "arch-ops-server"
+      ]
+    }
+  }
+}

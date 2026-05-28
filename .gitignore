@@ -1,5 +1,6 @@
 *.log
 build.conf
+opencode.json
 archlinux-rpi5-aarch64.img
 archlinux-rpi5-aarch64.img.xz
 archlinux-rpi5-aarch64.img.xz.sha256
