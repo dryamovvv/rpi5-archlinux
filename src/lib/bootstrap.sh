@@ -440,6 +440,11 @@ EMPTY_PRE_POST_CLEANUP="yes"
 EMPTY_PRE_POST_MIN_AGE="1800"
 SNAPCONF
 
+    # Register config in /etc/conf.d/snapper (snapper create-config does this)
+    if [[ -f "$target/etc/conf.d/snapper" ]]; then
+        sed -i 's/SNAPPER_CONFIGS=""/SNAPPER_CONFIGS="root"/' "$target/etc/conf.d/snapper"
+    fi
+
     if btrfs subvolume delete "$target/.snapshots" >/dev/null 2>&1; then
         log::info "Удален вложенный .snapshots subvolume внутри @"
     fi
