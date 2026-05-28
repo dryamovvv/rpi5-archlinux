@@ -142,7 +142,9 @@ jobs:
           echo "OK: config.txt validated"
 
       - name: Compress image
-        run: xz -9 -T0 dist/images/archlinux-rpi5-aarch64.img
+        run: |
+          xz -9 -T0 dist/images/archlinux-rpi5-aarch64.img || { ec=$?; if [ $ec -eq 2 ]; then echo "xz warning ignored (group ownership)"; else exit $ec; fi; }
+          test -f dist/images/archlinux-rpi5-aarch64.img.xz
 
       - name: Upload compressed image
         uses: actions/upload-artifact@v4
