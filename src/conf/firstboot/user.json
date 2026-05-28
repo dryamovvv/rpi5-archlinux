@@ -1,0 +1,11 @@
+{
+    "userName": "user",
+    "uid": 1000,
+    "gid": 1000,
+    "realName": "",
+    "shell": "/usr/bin/bash",
+    "memberOf": [],
+    "privileged": {
+        "hashedPassword": [["password", "", {"crypt": {"salted": "<password_hash>"}}]]
+    }
+}

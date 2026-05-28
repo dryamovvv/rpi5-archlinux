@@ -34,10 +34,13 @@ for t in tests/*.sh; do bash "$t" || echo "FAIL: $t"; done
 | `src/conf/boot/` | config.txt, cmdline.txt |
 | `src/conf/systemd/` | firstboot unit, tty drop-in |
 | `src/conf/pacman/` | pacman-arm.conf |
+| `src/conf/firstboot/` | user.json для homectl |
 | `build.conf.example` | шаблон конфига |
 | `scripts/package.sh` | упаковщик в один файл |
 | `tests/` | 13 shell-тестов |
 | `os_list.json` | для Network Install (RPi Imager) |
+| `docs/arch-mcp.md` | план форка arch-ops-server с авторизацией |
+| `docs/homectl.md` | план интеграции homectl + snapper |
 
 ## Ключевые правила
 
@@ -66,9 +69,27 @@ for t in tests/*.sh; do bash "$t" || echo "FAIL: $t"; done
 - Не менять формат `build.conf` без обновления `config::validate`
 - Не добавлять пароли/секреты в репо
 
+## MCP arch-linux (remote HTTP через arch-ops-server)
+
+23 инструмента для управления RPi5 Arch Linux через opencode:
+
+**Система:** `get_system_info`, `diagnose_system`, `run_system_health_check`, `analyze_storage`
+**Пакеты:** `get_official_package_info`, `check_updates_dry_run`, `install_package_secure`, `remove_packages`, `query_file_ownership`, `query_package_history`, `verify_package_integrity`, `manage_install_reason`, `manage_orphans`, `manage_groups`
+**AUR:** `search_aur`, `audit_package_security`
+**Конфиги:** `analyze_pacman_conf`, `analyze_makepkg_conf`
+**Зеркала:** `optimize_mirrors`
+**Новости:** `fetch_news`
+**База данных:** `check_database_freshness`
+**Arch Wiki:** `search_archwiki`
+**Безопасность:** `check_failed_services`, `get_boot_logs`
+
+Сервер: [dryamovvv/arch-mcp](https://github.com/dryamovvv/arch-mcp) (форк с Bearer auth), systemd unit `arch-ops-mcp.service` на RPi5, ключ в `~/.config/opencode/api-key`. См. [docs/arch-mcp.md](docs/arch-mcp.md).
+
 ## Подробные доки в `docs/`
 
 - [build-pipeline.md](docs/build-pipeline.md) — 12 шагов сборки
 - [qemu-testing.md](docs/qemu-testing.md) — QEMU тестирование и чек-лист
 - [configuration.md](docs/configuration.md) — build.conf, config.txt, cmdline.txt
 - [first-boot.md](docs/first-boot.md) — systemd-firstboot + firstboot flow
+- [arch-mcp.md](docs/arch-mcp.md) — форк arch-ops-server (HTTP + Bearer auth)
+- [homectl.md](docs/homectl.md) — интеграция homectl + snapper

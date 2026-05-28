@@ -14,6 +14,7 @@ Raspberry Pi 5 Arch Linux image build script.
 - `src/conf/pacman/` — active pacman-конфигурация, embedded в packaged builder и реально используемая `pacstrap`.
 - `src/conf/boot/` — active boot-файлы, embedded в packaged builder и записываемые в boot partition.
 - `src/conf/systemd/` — active systemd unit для first-boot provisioning, embedded в packaged builder и записываемый в root filesystem.
+- `src/conf/firstboot/` — template user identity JSON (`user.json`) для `homectl create --identity` на первом старте; наполняется из `build.conf` (см. [docs/homectl.md](docs/homectl.md)).
 
 ## Usage
 ```bash
@@ -91,11 +92,12 @@ cp build.conf.example build.conf
 
 ## Первый запуск
 
-- Пользователь (`dryam` по умолчанию) создается **без пароля**. При первом входе по SSH система потребует немедленную смену пароля.
+- Пользователь (`user` по умолчанию) создаётся через `homectl --storage=subvolume` (btrfs subvolume внутри `@home`). Пароль задаётся хешем из `build.conf` (`BUILD_USER_PASSWORD`), при первом логине система потребует смену пароля.
+- Home пользователя — отдельный btrfs subvolume `/home/user.homedir` (bind-mount в `/home/user`). Snapper автоматически настроен на снятие снапшотов home с таймлайном (hourly:5, daily:7, weekly:4, monthly:3).
 - Root-пароль задается в `build.conf` (переменная `BUILD_ROOT_PASSWORD`); по умолчанию — `root`.
 - После загрузки Raspberry Pi доступен по mDNS:
   ```bash
-  ssh dryam@arch-rpi5.local
+  ssh user@arch-rpi5.local
   ```
   или по IP-адресу, выданному DHCP-сервером.
 
