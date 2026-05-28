@@ -35,6 +35,8 @@ services::configure_services() {
 
   bootstrap::resize_root "$BUILD_MOUNT_ROOT"
 
+  bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-homed.service" "multi-user.target.wants"
+
   if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
     bootstrap::btrfs_setup_snapper "$BUILD_MOUNT_ROOT"
     bootstrap::btrfs_write_rollback_script "$BUILD_MOUNT_ROOT"

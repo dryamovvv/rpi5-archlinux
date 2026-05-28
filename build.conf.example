@@ -21,8 +21,9 @@ BUILD_QEMU_ROOTFLAGS="subvol=@"
 
 BUILD_HOSTNAME="archlinux-develop"
 BUILD_USER_NAME="user"
-# Хеш пароля подставляется в user.json для homectl create --identity.
+# Пароль пользователя. Хеш подставляется в user.json для homectl create --identity.
 # При первом логине система потребует смену пароля (--password-change-now=yes).
+# Оставьте пустым для интерактивного режима: homectl firstboot --prompt-new-user.
 BUILD_USER_PASSWORD="user"
 BUILD_SSH_USER="user"
 # Дополнительные пользователи для AllowUsers (через пробел), оставить пустым если не нужны

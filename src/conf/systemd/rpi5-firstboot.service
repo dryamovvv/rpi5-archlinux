@@ -1,6 +1,7 @@
 [Unit]
 Description=Complete first boot provisioning
-After=systemd-firstboot.service
+After=systemd-firstboot.service systemd-homed.service
+Wants=systemd-homed.service
 
 [Service]
 Type=oneshot
