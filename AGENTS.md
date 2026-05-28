@@ -41,6 +41,7 @@ for t in tests/*.sh; do bash "$t" || echo "FAIL: $t"; done
 | `os_list.json` | для Network Install (RPi Imager) |
 | `docs/arch-mcp.md` | план форка arch-ops-server с авторизацией |
 | `docs/homectl.md` | план интеграции homectl + snapper |
+| `docs/skills/` | opencode skills (arch-linux-mcp, arch-audit) для `~/.agents/skills/` |
 
 ## Ключевые правила
 

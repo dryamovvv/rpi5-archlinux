@@ -15,6 +15,7 @@ Raspberry Pi 5 Arch Linux image build script.
 - `src/conf/boot/` — active boot-файлы, embedded в packaged builder и записываемые в boot partition.
 - `src/conf/systemd/` — active systemd unit для first-boot provisioning, embedded в packaged builder и записываемый в root filesystem.
 - `src/conf/firstboot/` — template user identity JSON (`user.json`) для `homectl create --identity` на первом старте; наполняется из `build.conf` (см. [docs/homectl.md](docs/homectl.md)).
+- `docs/skills/` — готовые opencode skills для копирования в `~/.agents/skills/`.
 
 ## Usage
 ```bash
@@ -198,7 +199,11 @@ mkdir -p ~/.agents/skills/arch-linux-mcp ~/.agents/skills/arch-audit
 
 **arch-audit** — скилл-команда `/arch_audit`. При запуске выполняет все MCP-инструменты параллельно и собирает структурированный отчёт: система, здоровье, пакеты, конфиги, зеркала, новости, orphan-пакеты, boot logs. Полезен после установки нового образа для проверки здоровья RPi5.
 
-Содержимое скиллов можно взять из примеров в [`docs/arch-mcp.md`](docs/arch-mcp.md) (arch-linux-mcp) и [`docs/homectl.md`](docs/homectl.md) (шаблон для arch-audit) или скопировать из установленных в `~/.agents/skills/`.
+Готовые файлы лежат в [`docs/skills/`](docs/skills/). Установка одной командой:
+
+```bash
+cp -r docs/skills/* ~/.agents/skills/
+```
 
 ### 4. MCP-сервер (`opencode.json`)
 
