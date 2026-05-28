@@ -447,6 +447,7 @@ disk::btrfs_subvol_create_all() {
         "@"
         "@home"
         "@snapshots"
+        "@swap"
         "@var_log"
         "@var_cache"
         "@var_tmp"

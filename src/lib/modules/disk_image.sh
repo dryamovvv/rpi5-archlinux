@@ -66,9 +66,10 @@ disk_image::mount_filesystems() {
 
     if [[ "$root_fs" == "btrfs" ]]; then
         disk::btrfs_mount_subvol_root "$part_root" "$BUILD_MOUNT_ROOT"
-        mkdir -p "$BUILD_MOUNT_ROOT"/{home,.snapshots,var/{log,cache,tmp,lib}}
+        mkdir -p "$BUILD_MOUNT_ROOT"/{home,.snapshots,swap,var/{log,cache,tmp,lib}}
         disk::btrfs_mount_subvol "$part_root" "@home" "$BUILD_MOUNT_ROOT/home" "compress=zstd,noatime"
         disk::btrfs_mount_subvol "$part_root" "@snapshots" "$BUILD_MOUNT_ROOT/.snapshots" "noatime"
+        disk::btrfs_mount_subvol "$part_root" "@swap" "$BUILD_MOUNT_ROOT/swap" "noatime,nodatacow"
         disk::btrfs_mount_subvol "$part_root" "@var_log" "$BUILD_MOUNT_ROOT/var/log" "compress=zstd,noatime"
         disk::btrfs_mount_subvol "$part_root" "@var_cache" "$BUILD_MOUNT_ROOT/var/cache" "noatime,nodatacow"
         disk::btrfs_mount_subvol "$part_root" "@var_tmp" "$BUILD_MOUNT_ROOT/var/tmp" "noatime,nodatacow"
