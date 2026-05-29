@@ -65,4 +65,6 @@ services::configure_services() {
 # }
 EOF
   fi
+
+  bootstrap::mcp_server "$BUILD_MOUNT_ROOT"
 }

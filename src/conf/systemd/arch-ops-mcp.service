@@ -1,0 +1,13 @@
+[Unit]
+Description=Arch Linux MCP HTTP Server
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/arch-ops-mcp/env
+ExecStart=/root/.local/bin/arch-ops-server-http
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

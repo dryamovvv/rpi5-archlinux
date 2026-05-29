@@ -573,3 +573,30 @@ ROLLBACKSCRIPT
     chmod 0755 "$rollback_dir/rollback.sh"
     log::info "Rollback script: /usr/local/lib/rpi5-archlinux/rollback.sh"
 }
+
+bootstrap::mcp_server() {
+    local target="$1"
+    log::assert_not_empty "$target" "точка монтирования"
+
+    log::info "Installing arch-ops-server (MCP) in chroot..."
+    arch-chroot "$target" uv tool install "arch-ops-server[http]" --from git+https://github.com/dryamovvv/arch-mcp 2>&1 || \
+        log::warn "MCP server installation encountered issues"
+
+    local api_key
+    api_key=$(uuidgen)
+    mkdir -p "$target/etc/arch-ops-mcp"
+    cat > "$target/etc/arch-ops-mcp/env" <<EOF
+ARCH_OPS_SERVER_BIND=0.0.0.0
+ARCH_OPS_SERVER_API_KEY=$api_key
+EOF
+    chmod 600 "$target/etc/arch-ops-mcp/env"
+
+    printf '%s' "$api_key" > "${BUILD_IMAGE_PATH}.mcp-key"
+    chmod 600 "${BUILD_IMAGE_PATH}.mcp-key"
+    log::info "MCP API key saved to ${BUILD_IMAGE_PATH}.mcp-key"
+
+    assets::write "systemd/arch-ops-mcp.service" "$target/etc/systemd/system/arch-ops-mcp.service"
+    bootstrap::systemd_enable_custom_unit "$target" "arch-ops-mcp.service" "multi-user.target.wants"
+
+    log::info "arch-ops-server (MCP) configured"
+}

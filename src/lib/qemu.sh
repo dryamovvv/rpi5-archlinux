@@ -39,7 +39,7 @@ qemu::command() {
         -initrd "$(qemu::initramfs_path)" \
         -append "$qemu_cmdline" \
         -drive "file=$BUILD_IMAGE_PATH,format=raw,if=virtio" \
-        -netdev "user,id=net0,hostfwd=tcp::$BUILD_QEMU_SSH_HOST_PORT-:22" \
+        -netdev "user,id=net0,hostfwd=tcp::$BUILD_QEMU_SSH_HOST_PORT-:22,hostfwd=tcp::$BUILD_QEMU_MCP_HOST_PORT-:8080" \
         -device "virtio-net-pci,netdev=net0"
     printf '\n'
 }
