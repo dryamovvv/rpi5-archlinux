@@ -11,20 +11,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install validation dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            arch-install-scripts \
-            aria2 \
-            dosfstools \
-            e2fsprogs \
-            pacman-package-manager \
-            parted \
-            psmisc \
-            systemd \
-            udev \
-            util-linux
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck python3-yaml
 
       - name: Validate shell syntax
         run: bash -n scripts/*.sh src/main.sh src/lib/*.sh src/lib/core/*.sh src/lib/modules/*.sh tests/*.sh
