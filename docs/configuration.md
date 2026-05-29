@@ -11,8 +11,9 @@ BUILD_IMAGE_PATH="$BUILD_PROJECT_ROOT/dist/images/archlinux-rpi5-aarch64.img"
 BUILD_IMAGE_SIZE="4g"
 BUILD_MOUNT_ROOT="/mnt/arch_build"
 BUILD_MOUNT_BOOT="$BUILD_MOUNT_ROOT/boot"
-BUILD_USER_NAME="dryam"
+BUILD_USER_NAME="user"
 BUILD_SSH_USER="$BUILD_USER_NAME"
+BUILD_SSH_ALLOW_USERS=""           # дополнительные пользователи для AllowUsers
 BUILD_MKINITCPIO_HOOKS="HOOKS=(base systemd autodetect modconf kms keyboard keymap sd-vconsole block filesystems fsck)"
 BUILD_MODULES=(...)   # минимум 1 модуль
 BUILD_PACKAGES=(...)  # минимум 1 пакет
@@ -21,11 +22,16 @@ BUILD_PACKAGES=(...)  # минимум 1 пакет
 ### Опциональные поля
 
 ```bash
-BUILD_HOSTNAME=""           # пусто = systemd-firstboot спросит при загрузке
-BUILD_TIMEZONE=""           # пусто = спросит
-BUILD_ROOT_PASSWORD=""      # пусто = спросит
-BUILD_LOCALE="en_US.UTF-8"  # дефолт
-BUILD_KEYMAP="us"            # дефолт
+BUILD_HOSTNAME=""                # пусто = systemd-firstboot спросит при загрузке
+BUILD_TIMEZONE=""                # пусто = спросит
+BUILD_ROOT_PASSWORD=""           # пусто = спросит
+BUILD_USER_PASSWORD="user"       # хешируется в user.json; пусто = интерактивный/fallback режим
+BUILD_LOCALE="en_US.UTF-8"       # дефолт
+BUILD_KEYMAP="us"                # дефолт
+BUILD_FILESYSTEM="btrfs"         # btrfs (subvolumes + snapper) | ext4
+BUILD_SWAPFILE_SIZE="16G"        # btrfs swapfile; пусто = без swapfile
+BUILD_SHRINK_IMAGE=1             # 1 — финальное сжатие образа | 0 — пропустить
+BUILD_IMAGE_SHRINK_MARGIN="256M" # запас места при shrink
 BUILD_EEPROM_CHANNEL="latest"    # default | latest
 BUILD_MKINITCPIO_COMPRESSION="gzip"  # gzip | cat (быстрее)
 BUILD_ENABLE_ZRAM=0              # 0 | 1

@@ -14,7 +14,7 @@ Raspberry Pi 5 Arch Linux image build script.
 - `src/conf/pacman/` — active pacman-конфигурация, embedded в packaged builder и реально используемая `pacstrap`.
 - `src/conf/boot/` — active boot-файлы, embedded в packaged builder и записываемые в boot partition.
 - `src/conf/systemd/` — active systemd unit для first-boot provisioning, embedded в packaged builder и записываемый в root filesystem.
-- `src/conf/firstboot/` — template user identity JSON (`user.json`) для `homectl create --identity` на первом старте; наполняется из `build.conf` (см. [docs/homectl.md](docs/homectl.md)).
+- `src/conf/firstboot/` — deprecated (deleted); `user.json` is now generated at build time in `bootstrap::firstboot_service()` from `build.conf` variables (see [docs/homectl.md](docs/homectl.md)).
 - `docs/skills/` — готовые opencode skills для копирования в `~/.agents/skills/`.
 
 ## Usage
@@ -36,10 +36,11 @@ cp build.conf.example build.conf
 ```bash
 ./dist/bin/rpi5-archlinux-image build-qemu
 ./dist/bin/rpi5-archlinux-image qemu-run
-ssh -p 2222 dryam@localhost
+ssh -p 2222 user@localhost                     # password from BUILD_USER_PASSWORD (default: user)
+curl http://localhost:8080/health              # MCP server (embedded at build time)
 ```
 
-QEMU target builds `dist/images/archlinux-qemu-aarch64.img` and exports direct-boot files to `dist/images/qemu-boot/`. The runner uses `qemu-system-aarch64 -M virt` with virtio disk, serial console, user networking, and host SSH forwarding from `localhost:2222` to guest port `22`.
+QEMU target builds `dist/images/archlinux-qemu-aarch64.img` and exports direct-boot files to `dist/images/qemu-boot/`. The runner uses `qemu-system-aarch64 -M virt` with virtio disk, serial console, user networking, SSH forwarding from `localhost:2222` to guest port `22`, and MCP forwarding from `localhost:8080` to guest port `8080`.
 
 ## Validation
 ```bash
@@ -50,8 +51,8 @@ shellcheck scripts/*.sh src/main.sh src/lib/*.sh src/lib/core/*.sh src/lib/modul
 ```
 
 ## GitHub Actions
-- `.github/workflows/ci.yml` проверяет shell-скрипты и smoke-тесты.
-- `.github/workflows/release.yml` запускается на тегах `v*`, собирает Raspberry Pi образ на native `arm64` runner и публикует `archlinux-rpi5-aarch64.img.xz` с `.sha256`.
+- `.github/workflows/ci.yml` runs shell checks, smoke tests, and ARM build (on `dev` and `homectl_feature` branches). The ARM build validates boot files and uploads `archlinux-rpi5-aarch64.img.xz` as an artifact.
+- `.github/workflows/release.yml` runs on `v*` tags, builds the Raspberry Pi image on a native `arm64` runner, and publishes `archlinux-rpi5-aarch64.img.xz` with `.sha256` to GitHub Releases.
 - Локальный сценарий релиза:
 ```bash
 git tag v0.1.0
@@ -91,16 +92,17 @@ cp build.conf.example build.conf
 ./dist/bin/rpi5-archlinux-image qemu-run
 ```
 
-## Первый запуск
+## First boot
 
-- Пользователь (`user` по умолчанию) создаётся через `homectl --storage=subvolume` (btrfs subvolume внутри `@home`). Пароль задаётся хешем из `build.conf` (`BUILD_USER_PASSWORD`), при первом логине система потребует смену пароля.
-- Home пользователя — отдельный btrfs subvolume `/home/user.homedir` (bind-mount в `/home/user`). Snapper автоматически настроен на снятие снапшотов home с таймлайном (hourly:5, daily:7, weekly:4, monthly:3).
-- Root-пароль задается в `build.conf` (переменная `BUILD_ROOT_PASSWORD`); по умолчанию — `root`.
-- После загрузки Raspberry Pi доступен по mDNS:
+- User (`user` by default) is created via `homectl --storage=subvolume` (btrfs subvolume inside `@home`). Password is pre-hashed from `BUILD_USER_PASSWORD` in `build.conf`; the system forces a password change on first login. If `BUILD_USER_PASSWORD` is unset, an interactive wizard runs on TTY, or a `useradd` fallback on headless systems.
+- User home is a separate btrfs subvolume `/home/user.homedir`. Snapper auto-configures timeline snapshots (hourly:5, daily:7, weekly:4, monthly:3).
+- Root password is set from `BUILD_ROOT_PASSWORD` in `build.conf` (default: `root`).
+- The MCP server (`arch-ops-mcp.service`) is embedded at build time. The API key is saved as `<image>.mcp-key` alongside the image file.
+- After boot, the Raspberry Pi is reachable via mDNS:
   ```bash
   ssh user@arch-rpi5.local
   ```
-  или по IP-адресу, выданному DHCP-сервером.
+  or by the IP address assigned by DHCP.
 
 ## Загрузка с NVMe
 
@@ -228,11 +230,6 @@ cp -r docs/skills/* ~/.agents/skills/
 
 Устанавливается либо в `~/.config/opencode/opencode.json` (глобально), либо в `opencode.json` корня проекта (локально). API-ключ хранится в `~/.config/opencode/api-key`.
 
-На RPi5 сервер работает как systemd-сервис `arch-ops-mcp.service`. Установка на новый образ:
-
-```bash
-uv tool install --with starlette --with "uvicorn[standard]" \
-  'arch-ops-server @ git+https://github.com/dryamovvv/arch-mcp.git@master'
-```
+The MCP server is embedded in the image at build time via `bootstrap::mcp_server()`. It runs as a systemd service (`arch-ops-mcp.service`) and the API key is saved as `<image>.mcp-key` next to the image file.
 
 Подробнее — в [`docs/arch-mcp.md`](docs/arch-mcp.md).

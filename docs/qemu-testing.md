@@ -33,15 +33,21 @@ grep 'Finished Complete first boot' qemu-boot.log  # должен быть
 grep 'FAILED\|error\|Error' qemu-boot.log | grep -v regulatory.db
 
 # 5. Пробуем SSH
-ssh -p 2222 dryam@localhost  # пароль пустой, сменит при входе
+ssh -p 2222 user@localhost  # пароль из BUILD_USER_PASSWORD (по умолчанию 'user'), сменит при входе
 systemctl is-system-running  # → running
 systemctl list-units --state=failed  # → пусто
+# Для homectl: проверка пользователя
+homectl list  # должен показать user
+systemctl status systemd-homed.service  # → active
+# Проверка MCP-сервера (порт 8080)
+curl http://localhost:8080/health
+cat dist/images/archlinux-qemu-aarch64.img.mcp-key  # API-ключ
 ```
 
 ## Ограничения QEMU
 
 - `config.txt` не используется — overclock, GPU, device tree не тестируются
-- `systemd-firstboot` не интерактивен — hostname всегда `archlinux`
+- `systemd-firstboot` не интерактивен — hostname из `BUILD_HOSTNAME` (по умолчанию `archlinux-develop`)
 - Ядро: `linux-aarch64` (не `linux-rpi-16k`)
 - Сборка x86_64 через qemu-user-static: ~25 мин (ARM: 2 мин)
 
