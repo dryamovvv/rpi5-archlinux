@@ -27,27 +27,27 @@ for t in tests/*.sh; do bash "$t" || echo "FAIL: $t"; done
 | Путь | Назначение |
 |------|-----------|
 | `src/main.sh` | CLI entrypoint |
-| `src/lib/bootstrap.sh` | in-target настройка (firstboot, fstab, mkinitcpio, network, sshd) |
+| `src/lib/bootstrap.sh` | in-target настройка (firstboot, homectl identity, fstab, mkinitcpio, network, sshd, mcp_server) |
 | `src/lib/disk.sh` | loop-устройства, разделы, формат |
 | `src/lib/core/` | config, runner, steps, modules, assets |
 | `src/lib/modules/` | build-модули: disk_image, base_system, boot_config, services |
 | `src/conf/boot/` | config.txt, cmdline.txt |
-| `src/conf/systemd/` | firstboot unit, tty drop-in |
+| `src/conf/systemd/` | firstboot unit, tty drop-in, arch-ops-mcp.service |
 | `src/conf/pacman/` | pacman-arm.conf |
-| `src/conf/firstboot/` | user.json для homectl |
+| `src/conf/firstboot/` | deprecated (deleted); user.json generated at build time |
 | `build.conf.example` | шаблон конфига |
 | `scripts/package.sh` | упаковщик в один файл |
 | `tests/` | 13 shell-тестов |
 | `os_list.json` | для Network Install (RPi Imager) |
-| `docs/arch-mcp.md` | план форка arch-ops-server с авторизацией |
-| `docs/homectl.md` | план интеграции homectl + snapper |
+| `docs/arch-mcp.md` | arch-ops-server (встроен в образ, Bearer auth) |
+| `docs/homectl.md` | интеграция homectl + snapper (реализована) |
 | `docs/skills/` | opencode skills (arch-linux-mcp, arch-audit) для `~/.agents/skills/` |
 
 ## Ключевые правила
 
 1. **Всегда тестируй через QEMU перед коммитом** — см. `docs/qemu-testing.md`
 2. **Не удаляй `config.txt`** — он статический, правки напрямую
-3. **Пароли не хранить в коде** — пользователь задает при первой загрузке
+3. **Пароли не хранить в коде** — `BUILD_USER_PASSWORD` хешируется через `openssl passwd -6` и сохраняется как хеш в `user.json`
 4. **Отступ 4 пробела** в .sh, функции с namespace `module::function`
 5. **Пуш в `dev`** триггерит ARM-сборку в CI. **В `main` без разрешения НЕ пушить.**
    ```bash
@@ -64,8 +64,8 @@ Comprehensive system audit using all MCP tools. Type `/arch_audit` to get a stru
 
 ## CI/CD
 
-- **x86 (всегда):** bash -n + shellcheck + 13 тестов
-- **ARM (только `dev`):** полная сборка + валидация boot-файлов
+- **x86 (всегда):** bash -n + shellcheck + 10 тестов в CI
+- **ARM (`dev` и `homectl_feature`):** полная сборка + валидация boot-файлов
 - **Release (теги `v*`):** ARM сборка → .img.xz + os_list.json → GitHub Release
 
 ## Границы (что не трогать)
@@ -88,7 +88,7 @@ Comprehensive system audit using all MCP tools. Type `/arch_audit` to get a stru
 **Arch Wiki:** `search_archwiki`
 **Безопасность:** `check_failed_services`, `get_boot_logs`
 
-Сервер: [dryamovvv/arch-mcp](https://github.com/dryamovvv/arch-mcp) (форк с Bearer auth), systemd unit `arch-ops-mcp.service` на RPi5, ключ в `~/.config/opencode/api-key`. См. [docs/arch-mcp.md](docs/arch-mcp.md).
+Сервер: [dryamovvv/arch-mcp](https://github.com/dryamovvv/arch-mcp) (форк с Bearer auth), systemd unit `arch-ops-mcp.service` на RPi5, ключ в `~/.config/opencode/api-key`. MCP-сервер встраивается в образ автоматически при сборке (`bootstrap::mcp_server()`). API-ключ сохраняется в `<image>.mcp-key`. См. [docs/arch-mcp.md](docs/arch-mcp.md).
 
 ## Подробные доки в `docs/`
 
