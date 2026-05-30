@@ -32,10 +32,25 @@ jobs:
             mtools \
             xz-utils
 
-      - name: Package builder
+      - name: Configure release build
+        env:
+          LUKS_PASSWORD: ${{ secrets.BUILD_LUKS_PASSWORD }}
+          TG_BOT_TOKEN: ${{ secrets.BUILD_TELEGRAM_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.BUILD_TELEGRAM_CHAT_ID }}
         run: |
           cp build.conf.example build.conf
-          ./scripts/package.sh
+          if [[ -n "$LUKS_PASSWORD" ]]; then
+            echo "BUILD_ENABLE_ENCRYPTION=1" >> build.conf
+            echo "BUILD_LUKS_PASSWORD=$LUKS_PASSWORD" >> build.conf
+          fi
+          if [[ -n "$TG_BOT_TOKEN" ]] && [[ -n "$TG_CHAT_ID" ]]; then
+            echo "BUILD_LUKS_UNLOCK_MODE=telegram" >> build.conf
+            echo "BUILD_TELEGRAM_BOT_TOKEN=$TG_BOT_TOKEN" >> build.conf
+            echo "BUILD_TELEGRAM_CHAT_ID=$TG_CHAT_ID" >> build.conf
+          fi
+
+      - name: Package builder
+        run: ./scripts/package.sh
 
       - name: Build Arch Linux image
         run: ./dist/bin/rpi5-archlinux-image build
