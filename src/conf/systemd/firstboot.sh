@@ -7,52 +7,22 @@ IDENTITY_FILE="/usr/local/lib/rpi5-archlinux/user.json"
 
 log() { echo "firstboot: $*" >&2; }
 
-for i in $(seq 1 15); do
-	if systemctl is-active systemd-homed.service >/dev/null 2>&1; then
-		log "systemd-homed is active (waited ${i}s)"
-		break
-	fi
-	sleep 1
-done
-
-if ! systemctl is-active systemd-homed.service >/dev/null 2>&1; then
-	log "systemd-homed still not active after 15s, starting explicitly"
-	systemctl start systemd-homed.service 2>/dev/null || true
-	sleep 3
-fi
-
 if ! id -u "$USER_NAME" >/dev/null 2>&1; then
-	CREATED=0
+	log "creating user $USER_NAME via useradd"
+	useradd -m -G wheel "$USER_NAME"
 	if [[ -f "$IDENTITY_FILE" ]]; then
-		log "identity file found, trying homectl create..."
-		if homectl create --identity="$IDENTITY_FILE" --storage=subvolume; then
-			log "user $USER_NAME created via homectl create"
-			CREATED=1
-		else
-			log "homectl create failed (rc=$?), falling back"
-		fi
-	fi
-
-	if [[ $CREATED -eq 0 ]]; then
-		log "homectl failed — creating user via useradd"
-		useradd -m -G wheel "$USER_NAME"
-		if [[ -f "$IDENTITY_FILE" ]]; then
-			chpasswd -e <<<"${USER_NAME}:$(python3 -c "
+		chpasswd -e <<<"${USER_NAME}:$(python3 -c "
 import json
 d = json.load(open('$IDENTITY_FILE'))
 print(d['privileged']['hashedPassword'][0])
 ")"
-		else
-			passwd -d "$USER_NAME"
-		fi
+		log "password set from user.json hash"
+	else
+		passwd -d "$USER_NAME"
 	fi
 fi
 
 if [[ -n "$USER_NAME" ]]; then
-	if homectl list -j 2>/dev/null | python3 -c "import sys,json; users=[u['userName'] for u in json.load(sys.stdin)]; sys.exit(0 if '$USER_NAME' in users else 1)"; then
-		homectl update "$USER_NAME" --member-of=wheel --stop-delay=30 --password-change-now=yes || true
-	fi
-
 	loginctl enable-linger "$USER_NAME" 2>/dev/null || true
 
 	if [[ -f "/home/.ssh/authorized_keys" ]]; then
