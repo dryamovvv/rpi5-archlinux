@@ -14,7 +14,7 @@ services::configure_system() {
 	bootstrap::locale_gen_file "$BUILD_MOUNT_ROOT"
 	bootstrap::systemd_firstboot "$BUILD_MOUNT_ROOT"
 	arch-chroot "$BUILD_MOUNT_ROOT" locale-gen 2>&1 || log::warn "locale-gen encountered issues"
-	bootstrap::firstboot_service "$BUILD_MOUNT_ROOT" "$BUILD_USER_NAME"
+	bootstrap::firstboot_service "$BUILD_MOUNT_ROOT"
 }
 
 services::configure_services() {
@@ -34,8 +34,6 @@ services::configure_services() {
 	bootstrap::wifi_regdom "$BUILD_MOUNT_ROOT"
 
 	bootstrap::resize_root "$BUILD_MOUNT_ROOT"
-
-	bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-homed.service" "multi-user.target.wants"
 
 	if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
 		bootstrap::btrfs_setup_snapper "$BUILD_MOUNT_ROOT"

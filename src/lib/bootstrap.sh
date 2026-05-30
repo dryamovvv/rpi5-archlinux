@@ -202,53 +202,15 @@ bootstrap::systemd_firstboot() {
 
 bootstrap::firstboot_service() {
 	local target="$1"
-	local user_name="$2"
 
 	log::assert_not_empty "$target" "точка монтирования"
-	log::assert_not_empty "$user_name" "имя пользователя"
 
 	local identity_dir="$target/usr/local/lib/rpi5-archlinux"
 	mkdir -p "$identity_dir"
 
-	if [[ -n "${BUILD_USER_PASSWORD:-}" ]]; then
-		local password_hash
-		password_hash=$(openssl passwd -6 "$BUILD_USER_PASSWORD" 2>/dev/null)
-		if [[ -z "$password_hash" ]]; then
-			log::die "Failed to hash BUILD_USER_PASSWORD with openssl passwd -6"
-		fi
-
-		local identity_path="$identity_dir/user.json"
-		cat >"$identity_path" <<JSON
-{
-    "userName": "$user_name",
-    "uid": 1000,
-    "gid": 1000,
-    "realName": "",
-    "shell": "/usr/bin/bash",
-    "memberOf": [],
-    "privileged": {
-        "hashedPassword": ["$password_hash"]
-    }
-}
-JSON
-		chmod 0600 "$identity_path"
-		log::info "user.json created for $user_name"
-	else
-		log::info "BUILD_USER_PASSWORD not set — interactive homectl firstboot mode"
-	fi
-
-	mkdir -p "$target/home/.ssh"
-	chmod 0700 "$target/home/.ssh"
-
 	assets::write "systemd/firstboot.sh" "$identity_dir/firstboot.sh"
-	sed -i "s/__USER_NAME__/$user_name/g" "$identity_dir/firstboot.sh"
 	sed -i "s/__SWAPFILE_SIZE__/${BUILD_SWAPFILE_SIZE:-}/g" "$identity_dir/firstboot.sh"
 	chmod 0755 "$identity_dir/firstboot.sh"
-
-	# systemd-firstboot drop-in for interactive tty prompts
-	mkdir -p "$target/etc/systemd/system/systemd-firstboot.service.d"
-	assets::write "systemd/systemd-firstboot.service.d/prompt.conf" \
-		"$target/etc/systemd/system/systemd-firstboot.service.d/prompt.conf"
 
 	assets::write "systemd/rpi5-firstboot.service" "$target/etc/systemd/system/rpi5-firstboot.service"
 
