@@ -119,6 +119,64 @@ sudo rpi-eeprom-config --edit
 
 Подробнее см. официальную документацию Raspberry Pi: [NVMe SSD boot](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#nvme-ssd-boot).
 
+## LUKS disk encryption
+
+Full disk encryption via LUKS2 + remote SSH unlock. Encrypted builds are CI-only (arm64 runner, `btrbk-luks-fstrim` branch). Normal builds use `BUILD_ENABLE_ENCRYPTION=0` — no encryption.
+
+### SSH key for remote unlock
+
+tinysshd runs in initramfs, waits for SSH connection to unlock LUKS. Only **public key** is needed at build time.
+
+```bash
+# One-time: generate keypair
+ssh-keygen -t ed25519 -f ~/.ssh/luks_unlock -C "rpi5-luks"
+
+# Public key → GitHub (Settings → Secrets and variables → Actions → Variables)
+# Name: LUKS_UNLOCK_PUBKEY
+# Value: ssh-ed25519 AAAAC3...
+```
+
+### CI workflow
+
+```
+GitHub vars.LUKS_UNLOCK_PUBKEY          RPi5 first boot
+─────────────────────────────────────────────────────
+echo "$PUBKEY" > /etc/tinyssh/root_key  → tinysshd reads authorized_keys
+
+Your laptop:
+ssh -i ~/.ssh/luks_unlock root@rpi5     → SSH into initramfs
+(enter LUKS passphrase)                 → system boots
+```
+
+### Build variables
+
+```bash
+BUILD_ENABLE_ENCRYPTION=1               # enable LUKS (CI only)
+BUILD_LUKS_PASSWORD="..."              # LUKS passphrase
+BUILD_ROOT_SSH_KEY=""                  # path to public key for tinysshd
+BUILD_AUR_PKG_URL="..."                # pre-built mkinitcpio-systemd-extras
+                                       # (from aur/ in this repo)
+```
+
+### First boot with encryption
+
+1. Flash image to NVMe/USB
+2. RPi5 gets IP via DHCP in initramfs
+3. `ssh -i ~/.ssh/luks_unlock root@<rpi5-ip>`
+4. tinysshd prompts for LUKS password
+5. System decrypts and boots normally
+6. Subsequent reboots: same flow (LUKS always asks password on boot)
+
+### QEMU testing
+
+```bash
+BUILD_ENABLE_ENCRYPTION=1 BUILD_LUKS_PASSWORD="test" \
+    ./dist/bin/rpi5-archlinux-image build-qemu
+./dist/bin/rpi5-archlinux-image qemu-run
+# In QEMU console: enter LUKS password "test"
+ssh root@localhost -p 2222
+```
+
 ## Кастомизация
 
 Сборка поддерживает несколько опций для тонкой настройки образа:
