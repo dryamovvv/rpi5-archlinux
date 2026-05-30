@@ -21,11 +21,7 @@ BUILD_QEMU_KERNEL_CMDLINE="root=/dev/vda2 rw rootwait console=ttyAMA0"
 BUILD_QEMU_ROOTFLAGS="subvol=@"
 
 BUILD_HOSTNAME="archlinux-develop"
-BUILD_USER_NAME="user"
-# Пароль пользователя. Хеш подставляется в user.json для homectl create --identity.
-# При первом логине система потребует смену пароля (--password-change-now=yes).
-# Оставьте пустым для интерактивного режима: homectl firstboot --prompt-new-user.
-BUILD_USER_PASSWORD="user"
+# SSH пользователь для AllowUsers (root всегда разрешён)
 BUILD_SSH_USER="user"
 # Дополнительные пользователи для AllowUsers (через пробел), оставить пустым если не нужны
 BUILD_SSH_ALLOW_USERS=""
@@ -34,8 +30,8 @@ BUILD_TIMEZONE="Europe/Moscow"
 BUILD_MKINITCPIO_HOOKS="HOOKS=(base systemd autodetect modconf kms keyboard keymap sd-vconsole block filesystems fsck)"
 # Initramfs compression: "gzip" (default), "cat" (faster dev builds, no compression)
 BUILD_MKINITCPIO_COMPRESSION="gzip"
-# Image shrink after build: 1=shrink (default), 0=skip (faster dev builds)
-BUILD_SHRINK_IMAGE=1
+# Image shrink: controlled by "image_shrink" in BUILD_MODULES (line 49).
+# To skip shrinking, remove "image_shrink" from BUILD_MODULES.
 # ZRAM compression: 0=disabled, 1=enabled via systemd-zram-generator
 BUILD_ENABLE_ZRAM=1
 # ZRAM size: value in MEGABYTES (NOT with G suffix — fasteval treats G as 10^9, then *1024*1024 double-converts)
