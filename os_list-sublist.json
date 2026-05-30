@@ -1,0 +1,19 @@
+{
+  "os_list": [
+    {
+      "name": "Arch Linux ARM for Raspberry Pi 5",
+      "description": "Arch Linux ARM, headless, linux-rpi-16k kernel, btrfs + snapper rollback, git, vim, tmux, fail2ban, MCP server",
+      "url": "https://github.com/dryamovvv/archlinux-rpi5-aarch64/releases/latest/download/archlinux-rpi5-aarch64.img.xz",
+      "extract_size": "__SUBLIST_EXTRACT_SIZE__",
+      "extract_sha256": "__SUBLIST_EXTRACT_SHA256__",
+      "image_download_size": "__SUBLIST_DOWNLOAD_SIZE__",
+      "release_date": "__SUBLIST_RELEASE_DATE__",
+      "init_format": "none",
+      "devices": [
+        "pi5-64bit"
+      ],
+      "icon": "https://archlinux.org/static/logos/archlinux-logo-dark-90dpi.36f5.png",
+      "website": "https://github.com/dryamovvv/archlinux-rpi5-aarch64"
+    }
+  ]
+}

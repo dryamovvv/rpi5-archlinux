@@ -79,26 +79,39 @@ jobs:
           test -f "dist/images/${image_name}"
           sha256sum "dist/images/${image_name}" > "dist/images/${checksum_name}"
 
-      - name: Update os_list.json
+      - name: Update os_list.json and os_list-sublist.json
         run: |
           img_raw="dist/images/archlinux-rpi5-aarch64.img"
           img_xz="dist/images/archlinux-rpi5-aarch64.img.xz"
+          release_date="$(date +%Y-%m-%d)"
 
           extract_size=$(stat -c%s "$img_raw")
           extract_sha256=$(sha256sum "$img_raw" | cut -d' ' -f1)
           download_size=$(stat -c%s "$img_xz")
           download_sha256=$(sha256sum "$img_xz" | cut -d' ' -f1)
 
+          # Main os_list.json (with imager section, for --repo standalone usage)
           sed -i "s/__EXTRACT_SHA256__/$extract_sha256/" os_list.json
           sed -i "s/__DOWNLOAD_SHA256__/$download_sha256/" os_list.json
           sed -i "s/\"extract_size\": 4294967296/\"extract_size\": $extract_size/" os_list.json
           sed -i "s/\"image_download_size\": 500000000/\"image_download_size\": $download_size/" os_list.json
-          sed -i "s/__RELEASE_DATE__/$(date +%Y-%m-%d)/" os_list.json
+          sed -i "s/__RELEASE_DATE__/$release_date/" os_list.json
 
           echo "os_list.json updated:"
           cat os_list.json
 
+          # Clean sublist for official RPi Imager OS list (no imager section)
+          sed -e "s/__SUBLIST_EXTRACT_SIZE__/$extract_size/" \
+              -e "s/__SUBLIST_EXTRACT_SHA256__/$extract_sha256/" \
+              -e "s/__SUBLIST_DOWNLOAD_SIZE__/$download_size/" \
+              -e "s/__SUBLIST_RELEASE_DATE__/$release_date/" \
+              os_list-sublist.json > dist/images/os_list-sublist.json
+
+          echo "os_list-sublist.json generated:"
+          cat dist/images/os_list-sublist.json
+
           echo 'os_list.json' >> /tmp/release_assets.txt
+          echo 'dist/images/os_list-sublist.json' >> /tmp/release_assets.txt
 
       - name: Commit os_list.json back to main
         run: |
