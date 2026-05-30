@@ -580,11 +580,11 @@ bootstrap::mcp_server() {
 	log::assert_not_empty "$target" "точка монтирования"
 
 	log::info "Installing arch-ops-server (MCP) in chroot..."
-	arch-chroot "$target" uv tool install "arch-ops-server[http]" --from git+https://github.com/dryamovvv/arch-mcp 2>&1 ||
+	arch-chroot "$target" uv tool install --from "git+https://github.com/dryamovvv/arch-mcp" "arch-ops-server[http]" 2>&1 ||
 		log::warn "MCP server installation encountered issues"
 
 	local api_key
-	api_key=$(uuidgen)
+	api_key=$(python3 -c "import uuid; print(uuid.uuid4())")
 	mkdir -p "$target/etc/arch-ops-mcp"
 	cat >"$target/etc/arch-ops-mcp/env" <<EOF
 ARCH_OPS_SERVER_BIND=0.0.0.0
