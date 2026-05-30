@@ -41,10 +41,6 @@ config::select_qemu() {
 	BUILD_QEMU_KERNEL_CMDLINE="${BUILD_QEMU_KERNEL_CMDLINE:-root=/dev/vda2 rw rootwait console=ttyAMA0}"
 	BUILD_QEMU_ROOTFLAGS="${BUILD_QEMU_ROOTFLAGS:-}"
 
-	if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]] && [[ -z "$BUILD_QEMU_ROOTFLAGS" ]]; then
-		BUILD_QEMU_ROOTFLAGS="subvol=@"
-	fi
-
 	if declare -p BUILD_QEMU_MODULES >/dev/null 2>&1; then
 		BUILD_MODULES=("${BUILD_QEMU_MODULES[@]}")
 	else

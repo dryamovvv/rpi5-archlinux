@@ -116,7 +116,7 @@ bootstrap::generate_btrfs_fstab() {
 	log::info "Генерация /etc/fstab для btrfs subvolume layout..."
 	cat <<EOF >"$target/etc/fstab"
 # /etc/fstab — btrfs subvolume layout
-UUID=$root_uuid /          btrfs rw,noatime,compress=zstd,x-systemd.device-timeout=90,subvol=@       0 0
+UUID=$root_uuid /          btrfs rw,noatime,compress=zstd,x-systemd.device-timeout=90 0 0
 UUID=$root_uuid /home      btrfs rw,noatime,compress=zstd,subvol=@home    0 0
 UUID=$root_uuid /.snapshots btrfs rw,noatime,subvol=@snapshots            0 0
 UUID=$root_uuid /var/log   btrfs rw,noatime,compress=zstd,subvol=@var_log 0 0
@@ -245,8 +245,6 @@ bootstrap::cmdline_txt() {
 
 	if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
 		sed -i '1s/ fsck.repair=yes//' "$target/cmdline.txt"
-		sed -i '1s/$/ rootflags=subvol=@/' "$target/cmdline.txt"
-		log::info "cmdline.txt: добавлен rootflags=subvol=@"
 	fi
 
 	if [[ -s "$target/cmdline.txt" ]]; then
@@ -538,87 +536,9 @@ SNAPCONF
 	log::success "Snapper настроен"
 }
 
-bootstrap::btrfs_write_rollback_script() {
-	local target="$1"
-	log::assert_not_empty "$target" "точка монтирования"
-
-	local rollback_dir="$target/usr/local/lib/rpi5-archlinux"
-	mkdir -p "$rollback_dir"
-
-	cat <<'ROLLBACKSCRIPT' >"$rollback_dir/rollback.sh"
-#!/bin/bash
-set -euo pipefail
-
-ROLLBACK_NUM="${1:-}"
-
-if [[ -z "$ROLLBACK_NUM" ]]; then
-    echo "Usage: rollback.sh <snapshot_number>"
-    echo ""
-    echo "Available snapshots:"
-    snapper -c root list
-    exit 1
-fi
-
-ROOT_DEV="$(findmnt -n -o SOURCE /)"
-ROOT_DEV="${ROOT_DEV%%[*}"
-
-echo "==> Snapshot #$ROLLBACK_NUM will replace the current @ subvolume."
-echo "==> WARNING: All changes since the snapshot will be lost!"
-read -rp "Continue? [y/N] " confirm
-[[ "$confirm" == "y" || "$confirm" == "Y" ]] || { echo "Aborted."; exit 0; }
-
-trap 'umount /tmp/btrfs_top 2>/dev/null; rmdir /tmp/btrfs_top 2>/dev/null; rmdir /tmp/btrfs_new 2>/dev/null' EXIT
-
-echo "==> Mounting top-level subvolume..."
-mkdir -p /tmp/btrfs_top
-mount -o subvolid=5 "$ROOT_DEV" /tmp/btrfs_top
-
-SNAP_SUBVOL="/tmp/btrfs_top/@snapshots/$ROLLBACK_NUM/snapshot"
-if [[ ! -d "$SNAP_SUBVOL" ]]; then
-    echo "ERROR: Snapshot $ROLLBACK_NUM not found"
-    exit 1
-fi
-
-echo "==> Saving snapper config from current @..."
-mkdir -p /tmp/btrfs_new
-mount -o subvol=@ "$ROOT_DEV" /tmp/btrfs_new
-SNAPPER_ROOT=""
-if [[ -f /tmp/btrfs_new/etc/snapper/configs/root ]]; then
-    SNAPPER_ROOT="$(cat /tmp/btrfs_new/etc/snapper/configs/root)"
-fi
-umount /tmp/btrfs_new
-
-echo "==> Removing previous @.old if exists..."
-if [[ -d /tmp/btrfs_top/@.old ]]; then
-    btrfs subvolume list -o /tmp/btrfs_top/@.old 2>/dev/null | awk '{print $NF}' \
-        | while read -r sv; do btrfs subvolume delete "/tmp/btrfs_top/$sv"; done 2>/dev/null || true
-    btrfs subvolume delete /tmp/btrfs_top/@.old 2>/dev/null || true
-fi
-
-echo "==> Moving current @ to @.old..."
-mv /tmp/btrfs_top/@ /tmp/btrfs_top/@.old
-
-echo "==> Creating read-write snapshot of #$ROLLBACK_NUM as new @..."
-btrfs subvolume snapshot "$SNAP_SUBVOL" /tmp/btrfs_top/@
-
-echo "==> Restoring snapper config into new @..."
-mount -o subvol=@ "$ROOT_DEV" /tmp/btrfs_new
-mkdir -p /tmp/btrfs_new/etc/snapper/configs /tmp/btrfs_new/etc/conf.d
-if [[ -n "$SNAPPER_ROOT" ]]; then
-    cat >/tmp/btrfs_new/etc/snapper/configs/root <<<"$SNAPPER_ROOT"
-fi
-sed -i 's/SNAPPER_CONFIGS=""/SNAPPER_CONFIGS="root"/' /tmp/btrfs_new/etc/conf.d/snapper 2>/dev/null || \
-    echo 'SNAPPER_CONFIGS="root"' >/tmp/btrfs_new/etc/conf.d/snapper
-umount /tmp/btrfs_new
-
-echo "==> Rollback complete. Reboot to use the restored system."
-echo "    Old root preserved as @.old — delete manually after reboot:"
-echo "      mount -o subvolid=5 /dev/root /tmp/btrfs_top && btrfs subvolume delete /tmp/btrfs_top/@.old"
-echo "    sudo reboot"
-ROLLBACKSCRIPT
-	chmod 0755 "$rollback_dir/rollback.sh"
-	log::info "Rollback script: /usr/local/lib/rpi5-archlinux/rollback.sh"
-}
+# Native snapper rollback replaces custom rollback.sh (v0.10.0)
+# btrfs subvolume set-default @ is done at image creation time
+# Users can use: snapper -c root rollback <snap_num> && reboot
 
 bootstrap::mcp_server() {
 	local target="$1"
