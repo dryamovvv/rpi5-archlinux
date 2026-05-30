@@ -1,0 +1,13 @@
+#!/bin/bash
+build() {
+    add_binary /usr/bin/curl
+    add_file /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+    add_runscript
+}
+
+help() {
+    cat <<'HELPEOF'
+Polls Telegram Bot API for LUKS passphrase during initramfs.
+Runs between sd-network and sd-encrypt.
+HELPEOF
+}

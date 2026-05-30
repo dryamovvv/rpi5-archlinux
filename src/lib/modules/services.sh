@@ -30,8 +30,23 @@ services::configure_services() {
 		bootstrap::disable_swap "$BUILD_MOUNT_ROOT"
 	fi
 
+	if [[ "${BUILD_ENABLE_FIREWALL:-1}" == "1" ]]; then
+		log::info "Enable nftables firewall"
+		assets::write "nftables/nftables.conf" "$BUILD_MOUNT_ROOT/etc/nftables.conf"
+		bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "nftables.service" "multi-user.target.wants"
+	fi
+
+	if [[ "${BUILD_ENABLE_FSTRIM:-1}" == "1" ]]; then
+		log::info "Enable fstrim.timer (weekly NVMe/SSD TRIM)"
+		bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "fstrim.timer" "timers.target.wants"
+	fi
+
 	bootstrap::cpu_boost "$BUILD_MOUNT_ROOT"
 	bootstrap::wifi_regdom "$BUILD_MOUNT_ROOT"
+
+	if [[ "${BUILD_ENABLE_ENCRYPTION:-0}" == "1" ]]; then
+		bootstrap::luks_initramfs "$BUILD_MOUNT_ROOT"
+	fi
 
 	bootstrap::resize_root "$BUILD_MOUNT_ROOT"
 
@@ -52,8 +67,15 @@ services::configure_services() {
 	assets::write "fail2ban/sshd.conf" "$BUILD_MOUNT_ROOT/etc/fail2ban/jail.d/sshd.conf"
 	bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "fail2ban.service" "multi-user.target.wants"
 
-	log::info "Enable systemd-journal-gatewayd (HTTP logs on port 19531)"
-	bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-journal-gatewayd.socket" "sockets.target.wants"
+	if [[ "${BUILD_ENABLE_JOURNAL_GATEWAY:-1}" == "1" ]]; then
+		log::info "Enable systemd-journal-gatewayd (HTTP logs on 127.0.0.1:19531)"
+		mkdir -p "$BUILD_MOUNT_ROOT/etc/systemd/system/systemd-journal-gatewayd.socket.d"
+		cat >"$BUILD_MOUNT_ROOT/etc/systemd/system/systemd-journal-gatewayd.socket.d/override.conf" <<'EOF'
+[Socket]
+ListenStream=127.0.0.1:19531
+EOF
+		bootstrap::systemd_enable_unit "$BUILD_MOUNT_ROOT" "systemd-journal-gatewayd.socket" "sockets.target.wants"
+	fi
 
 	if [[ "${BUILD_ENABLE_WIFI:-0}" == "1" ]]; then
 		log::info "Wi-Fi enabled"
@@ -67,5 +89,7 @@ services::configure_services() {
 EOF
 	fi
 
-	bootstrap::mcp_server "$BUILD_MOUNT_ROOT"
+	if [[ "${BUILD_ENABLE_MCP_SERVER:-1}" == "1" ]]; then
+		bootstrap::mcp_server "$BUILD_MOUNT_ROOT"
+	fi
 }

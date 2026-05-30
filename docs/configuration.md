@@ -11,8 +11,10 @@ BUILD_IMAGE_PATH="$BUILD_PROJECT_ROOT/dist/images/archlinux-rpi5-aarch64.img"
 BUILD_IMAGE_SIZE="4g"
 BUILD_MOUNT_ROOT="/mnt/arch_build"
 BUILD_MOUNT_BOOT="$BUILD_MOUNT_ROOT/boot"
-BUILD_SSH_USER="root"
+BUILD_SSH_USER=""                # пусто = только root; имя для AllowUsers
 BUILD_SSH_ALLOW_USERS=""           # дополнительные пользователи для AllowUsers
+BUILD_SSH_PERMIT_ROOT_LOGIN="yes"  # yes (password+key) | prohibit-password (key only) | no
+BUILD_ROOT_SSH_KEY=""              # публичный SSH-ключ для root
 BUILD_MKINITCPIO_HOOKS="HOOKS=(base systemd autodetect modconf kms keyboard keymap sd-vconsole block filesystems fsck)"
 BUILD_MODULES=(...)   # минимум 1 модуль
 BUILD_PACKAGES=(...)  # минимум 1 пакет

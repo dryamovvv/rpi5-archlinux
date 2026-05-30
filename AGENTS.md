@@ -98,3 +98,4 @@ Comprehensive system audit using all MCP tools. Type `/arch_audit` to get a stru
 - [first-boot.md](docs/first-boot.md) — systemd-firstboot + firstboot flow
 - [arch-mcp.md](docs/arch-mcp.md) — форк arch-ops-server (HTTP + Bearer auth)
 - [homectl.md](docs/homectl.md) — попытка интеграции homectl; откат на useradd (v0.5.0)
+- [backup.md](docs/backup.md) — btrbk: инкрементальные бэкапы сценарии local/SSH/cold-storage

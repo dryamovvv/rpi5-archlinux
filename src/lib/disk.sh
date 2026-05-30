@@ -4,7 +4,7 @@ set -euo pipefail
 
 # Защита от повторного импорта
 if [[ -n "${_LIB_DISK_LOADED:-}" ]]; then
-    return
+	return
 fi
 readonly _LIB_DISK_LOADED=1
 
@@ -17,529 +17,568 @@ RESOLVED_PARTITION_PATH=""
 declare -Ag PARTITION_LOOP_DEVS=()
 
 disk::partition_device_path() {
-    local loop_dev="$1"
-    local partition_number="$2"
+	local loop_dev="$1"
+	local partition_number="$2"
 
-    log::assert_not_empty "$loop_dev" "loop device"
-    log::assert_not_empty "$partition_number" "partition number"
+	log::assert_not_empty "$loop_dev" "loop device"
+	log::assert_not_empty "$partition_number" "partition number"
 
-    printf '%sp%s\n' "$loop_dev" "$partition_number"
+	printf '%sp%s\n' "$loop_dev" "$partition_number"
 }
 
 disk::partition_layout() {
-    local loop_dev="$1"
-    local partition_number="$2"
-    local partition_line=""
-    local start_sector=""
-    local size_sectors=""
-    local sector_size=""
+	local loop_dev="$1"
+	local partition_number="$2"
+	local partition_line=""
+	local start_sector=""
+	local size_sectors=""
+	local sector_size=""
 
-    log::assert_not_empty "$loop_dev" "loop device"
-    log::assert_not_empty "$partition_number" "partition number"
+	log::assert_not_empty "$loop_dev" "loop device"
+	log::assert_not_empty "$partition_number" "partition number"
 
-    partition_line="$(sfdisk --dump "$loop_dev" | grep "^${loop_dev}p${partition_number}[[:space:]]*:")"
-    if [[ -z "$partition_line" ]]; then
-        log::die "Не удалось прочитать разметку для раздела ${partition_number} устройства $loop_dev"
-    fi
+	partition_line="$(sfdisk --dump "$loop_dev" | grep "^${loop_dev}p${partition_number}[[:space:]]*:")"
+	if [[ -z "$partition_line" ]]; then
+		log::die "Не удалось прочитать разметку для раздела ${partition_number} устройства $loop_dev"
+	fi
 
-    start_sector="$(sed -E 's/.*start=[[:space:]]*([0-9]+).*/\1/' <<<"$partition_line")"
-    size_sectors="$(sed -E 's/.*size=[[:space:]]*([0-9]+).*/\1/' <<<"$partition_line")"
-    sector_size="$(blockdev --getss "$loop_dev")"
+	start_sector="$(sed -E 's/.*start=[[:space:]]*([0-9]+).*/\1/' <<<"$partition_line")"
+	size_sectors="$(sed -E 's/.*size=[[:space:]]*([0-9]+).*/\1/' <<<"$partition_line")"
+	sector_size="$(blockdev --getss "$loop_dev")"
 
-    printf '%s %s %s\n' "$start_sector" "$size_sectors" "$sector_size"
+	printf '%s %s %s\n' "$start_sector" "$size_sectors" "$sector_size"
 }
 
 disk::attach_partition_loop() {
-    local partition_number="$1"
-    local start_sector=""
-    local size_sectors=""
-    local sector_size=""
-    local offset_bytes=""
-    local size_bytes=""
-    local partition_loop_dev=""
-    local layout=""
+	local partition_number="$1"
+	local start_sector=""
+	local size_sectors=""
+	local sector_size=""
+	local offset_bytes=""
+	local size_bytes=""
+	local partition_loop_dev=""
+	local layout=""
 
-    log::assert_not_empty "$CURRENT_LOOP_DEV" "current loop device"
-    log::assert_not_empty "$CURRENT_IMAGE_PATH" "current image path"
-    log::assert_not_empty "$partition_number" "partition number"
+	log::assert_not_empty "$CURRENT_LOOP_DEV" "current loop device"
+	log::assert_not_empty "$CURRENT_IMAGE_PATH" "current image path"
+	log::assert_not_empty "$partition_number" "partition number"
 
-    if [[ -n "${PARTITION_LOOP_DEVS[$partition_number]:-}" ]]; then
-        RESOLVED_PARTITION_PATH="${PARTITION_LOOP_DEVS[$partition_number]}"
-        return 0
-    fi
+	if [[ -n "${PARTITION_LOOP_DEVS[$partition_number]:-}" ]]; then
+		RESOLVED_PARTITION_PATH="${PARTITION_LOOP_DEVS[$partition_number]}"
+		return 0
+	fi
 
-    layout="$(disk::partition_layout "$CURRENT_LOOP_DEV" "$partition_number")"
-    read -r start_sector size_sectors sector_size <<<"$layout"
+	layout="$(disk::partition_layout "$CURRENT_LOOP_DEV" "$partition_number")"
+	read -r start_sector size_sectors sector_size <<<"$layout"
 
-    offset_bytes=$((start_sector * sector_size))
-    size_bytes=$((size_sectors * sector_size))
+	offset_bytes=$((start_sector * sector_size))
+	size_bytes=$((size_sectors * sector_size))
 
-    partition_loop_dev="$(
-        losetup --find --show \
-            --offset "$offset_bytes" \
-            --sizelimit "$size_bytes" \
-            "$CURRENT_IMAGE_PATH"
-    )"
+	partition_loop_dev="$(
+		losetup --find --show \
+			--offset "$offset_bytes" \
+			--sizelimit "$size_bytes" \
+			"$CURRENT_IMAGE_PATH"
+	)"
 
-    if [[ -z "$partition_loop_dev" ]]; then
-        log::die "Не удалось создать loop-устройство для раздела ${partition_number}"
-    fi
+	if [[ -z "$partition_loop_dev" ]]; then
+		log::die "Не удалось создать loop-устройство для раздела ${partition_number}"
+	fi
 
-    PARTITION_LOOP_DEVS[$partition_number]="$partition_loop_dev"
-    # shellcheck disable=SC2034
-    RESOLVED_PARTITION_PATH="$partition_loop_dev"
-    log::info "Создано loop-устройство раздела ${partition_number}: $partition_loop_dev"
+	PARTITION_LOOP_DEVS[$partition_number]="$partition_loop_dev"
+	# shellcheck disable=SC2034
+	RESOLVED_PARTITION_PATH="$partition_loop_dev"
+	log::info "Создано loop-устройство раздела ${partition_number}: $partition_loop_dev"
 }
 
 disk::resolve_partition_path() {
-    local loop_dev="$1"
-    local partition_number="$2"
-    local part_path=""
+	local loop_dev="$1"
+	local partition_number="$2"
+	local part_path=""
 
-    log::assert_not_empty "$loop_dev" "loop device"
-    log::assert_not_empty "$partition_number" "partition number"
+	log::assert_not_empty "$loop_dev" "loop device"
+	log::assert_not_empty "$partition_number" "partition number"
 
-    part_path="$(disk::partition_device_path "$loop_dev" "$partition_number")"
-    if [[ -e "$part_path" ]]; then
-        # shellcheck disable=SC2034
-        RESOLVED_PARTITION_PATH="$part_path"
-        return 0
-    fi
+	part_path="$(disk::partition_device_path "$loop_dev" "$partition_number")"
+	if [[ -e "$part_path" ]]; then
+		# shellcheck disable=SC2034
+		RESOLVED_PARTITION_PATH="$part_path"
+		return 0
+	fi
 
-    partprobe "$loop_dev"
-    partx -u "$loop_dev"
-    udevadm settle
+	partprobe "$loop_dev"
+	partx -u "$loop_dev"
+	udevadm settle
 
-    part_path="$(disk::partition_device_path "$loop_dev" "$partition_number")"
-    if [[ -e "$part_path" ]]; then
-        # shellcheck disable=SC2034
-        RESOLVED_PARTITION_PATH="$part_path"
-        return 0
-    fi
+	part_path="$(disk::partition_device_path "$loop_dev" "$partition_number")"
+	if [[ -e "$part_path" ]]; then
+		# shellcheck disable=SC2034
+		RESOLVED_PARTITION_PATH="$part_path"
+		return 0
+	fi
 
-    log::warn "Разделы не появились после partprobe, создаем отдельное loop-устройство для раздела ${partition_number}..."
-    disk::attach_partition_loop "$partition_number"
+	log::warn "Разделы не появились после partprobe, создаем отдельное loop-устройство для раздела ${partition_number}..."
+	disk::attach_partition_loop "$partition_number"
 }
 
 disk::create_image() {
-    local img_path="$1"
-    local size="$2"
+	local img_path="$1"
+	local size="$2"
 
-    log::assert_not_empty "$img_path" "путь к образу"
-    log::assert_not_empty "$size" "размер образа"
+	log::assert_not_empty "$img_path" "путь к образу"
+	log::assert_not_empty "$size" "размер образа"
 
-    if test -f "$img_path"; then
-        log::warn "$img_path уже присутствует в системе"
-        if mv "$img_path" "$img_path.bak"; then
-            log::info "Файл $img_path перемещен в $img_path.bak"
-        else
-            log::die "Не удалось переместить $img_path в $img_path.bak"
+	if test -f "$img_path"; then
+		log::warn "$img_path уже присутствует в системе"
+		if mv "$img_path" "$img_path.bak"; then
+			log::info "Файл $img_path перемещен в $img_path.bak"
+		else
+			log::die "Не удалось переместить $img_path в $img_path.bak"
 
-        fi
-    fi
+		fi
+	fi
 
-    # Используем sparse-файл, чтобы не тратить место хоста на пустые блоки.
-    log::info "Создание образа $img_path размером $size..."
-    truncate -s "$size" "$img_path"
+	# Используем sparse-файл, чтобы не тратить место хоста на пустые блоки.
+	log::info "Создание образа $img_path размером $size..."
+	truncate -s "$size" "$img_path"
 }
 
 disk::size_to_bytes() {
-    local size="$1"
-    local number=""
-    local unit=""
-    local multiplier=1
+	local size="$1"
+	local number=""
+	local unit=""
+	local multiplier=1
 
-    log::assert_not_empty "$size" "size"
+	log::assert_not_empty "$size" "size"
 
-    if [[ "$size" =~ ^([0-9]+)([bBkKmMgG]?)$ ]]; then
-        number="${BASH_REMATCH[1]}"
-        unit="${BASH_REMATCH[2],,}"
-    else
-        log::die "Некорректный размер: $size"
-    fi
+	if [[ "$size" =~ ^([0-9]+)([bBkKmMgG]?)$ ]]; then
+		number="${BASH_REMATCH[1]}"
+		unit="${BASH_REMATCH[2],,}"
+	else
+		log::die "Некорректный размер: $size"
+	fi
 
-    case "$unit" in
-        ""|b)
-            multiplier=1
-            ;;
-        k)
-            multiplier=1024
-            ;;
-        m)
-            multiplier=$((1024 * 1024))
-            ;;
-        g)
-            multiplier=$((1024 * 1024 * 1024))
-            ;;
-        *)
-            log::die "Неподдерживаемая единица размера: $unit"
-            ;;
-    esac
+	case "$unit" in
+	"" | b)
+		multiplier=1
+		;;
+	k)
+		multiplier=1024
+		;;
+	m)
+		multiplier=$((1024 * 1024))
+		;;
+	g)
+		multiplier=$((1024 * 1024 * 1024))
+		;;
+	*)
+		log::die "Неподдерживаемая единица размера: $unit"
+		;;
+	esac
 
-    printf '%s\n' "$((number * multiplier))"
+	printf '%s\n' "$((number * multiplier))"
 }
 
 disk::ceil_div() {
-    local value="$1"
-    local divisor="$2"
+	local value="$1"
+	local divisor="$2"
 
-    log::assert_not_empty "$value" "value"
-    log::assert_not_empty "$divisor" "divisor"
+	log::assert_not_empty "$value" "value"
+	log::assert_not_empty "$divisor" "divisor"
 
-    printf '%s\n' "$(((value + divisor - 1) / divisor))"
+	printf '%s\n' "$(((value + divisor - 1) / divisor))"
 }
 
 disk::ext4_size_bytes() {
-    local part="$1"
-    local block_count=""
-    local block_size=""
+	local part="$1"
+	local block_count=""
+	local block_size=""
 
-    log::assert_not_empty "$part" "root partition"
+	log::assert_not_empty "$part" "root partition"
 
-    while IFS=: read -r key value; do
-        value="${value//[[:space:]]/}"
-        case "$key" in
-            "Block count")
-                block_count="$value"
-                ;;
-            "Block size")
-                block_size="$value"
-                ;;
-        esac
-    done < <(dumpe2fs -h "$part" 2>/dev/null)
+	while IFS=: read -r key value; do
+		value="${value//[[:space:]]/}"
+		case "$key" in
+		"Block count")
+			block_count="$value"
+			;;
+		"Block size")
+			block_size="$value"
+			;;
+		esac
+	done < <(dumpe2fs -h "$part" 2>/dev/null)
 
-    log::assert_not_empty "$block_count" "ext4 block count"
-    log::assert_not_empty "$block_size" "ext4 block size"
+	log::assert_not_empty "$block_count" "ext4 block count"
+	log::assert_not_empty "$block_size" "ext4 block size"
 
-    printf '%s\n' "$((block_count * block_size))"
+	printf '%s\n' "$((block_count * block_size))"
 }
 
 disk::detach_partition_loops() {
-    local partition_loop_dev=""
+	local partition_loop_dev=""
 
-    for partition_loop_dev in "${PARTITION_LOOP_DEVS[@]:-}"; do
-        if [[ -n "$partition_loop_dev" ]]; then
-            log::info "Отключение устройства раздела $partition_loop_dev перед изменением таблицы разделов..."
-            losetup -d "$partition_loop_dev" 2>/dev/null ||
-                log::warn "Не удалось освободить $partition_loop_dev"
-        fi
-    done
-    PARTITION_LOOP_DEVS=()
+	for partition_loop_dev in "${PARTITION_LOOP_DEVS[@]:-}"; do
+		if [[ -n "$partition_loop_dev" ]]; then
+			log::info "Отключение устройства раздела $partition_loop_dev перед изменением таблицы разделов..."
+			losetup -d "$partition_loop_dev" 2>/dev/null ||
+				log::warn "Не удалось освободить $partition_loop_dev"
+		fi
+	done
+	PARTITION_LOOP_DEVS=()
 }
 
 disk::rewrite_partition_size() {
-    local loop_dev="$1"
-    local partition_number="$2"
-    local new_size_sectors="$3"
-    local partition_prefix=""
-    local line=""
-    local device_field=""
-    local found=0
-    local dump_file=""
+	local loop_dev="$1"
+	local partition_number="$2"
+	local new_size_sectors="$3"
+	local partition_prefix=""
+	local line=""
+	local device_field=""
+	local found=0
+	local dump_file=""
 
-    log::assert_not_empty "$loop_dev" "loop device"
-    log::assert_not_empty "$partition_number" "partition number"
-    log::assert_not_empty "$new_size_sectors" "new partition size"
+	log::assert_not_empty "$loop_dev" "loop device"
+	log::assert_not_empty "$partition_number" "partition number"
+	log::assert_not_empty "$new_size_sectors" "new partition size"
 
-    partition_prefix="$(disk::partition_device_path "$loop_dev" "$partition_number")"
-    dump_file="$(mktemp)"
-    trap 'rm -f "$dump_file"' RETURN
+	partition_prefix="$(disk::partition_device_path "$loop_dev" "$partition_number")"
+	dump_file="$(mktemp)"
+	trap 'rm -f "$dump_file"' RETURN
 
-    while IFS= read -r line; do
-        device_field="${line%%:*}"
-        device_field="${device_field//[[:space:]]/}"
-        if [[ "$device_field" == "$partition_prefix" ]]; then
-            line="$(sed -E "s/size=[[:space:]]*[0-9]+/size= $new_size_sectors/" <<<"$line")"
-            found=1
-        fi
-        printf '%s\n' "$line" >>"$dump_file"
-    done < <(sfdisk --dump "$loop_dev")
+	while IFS= read -r line; do
+		device_field="${line%%:*}"
+		device_field="${device_field//[[:space:]]/}"
+		if [[ "$device_field" == "$partition_prefix" ]]; then
+			line="$(sed -E "s/size=[[:space:]]*[0-9]+/size= $new_size_sectors/" <<<"$line")"
+			found=1
+		fi
+		printf '%s\n' "$line" >>"$dump_file"
+	done < <(sfdisk --dump "$loop_dev")
 
-    ((found == 1)) || log::die "Не удалось найти раздел ${partition_number} в таблице $loop_dev"
+	((found == 1)) || log::die "Не удалось найти раздел ${partition_number} в таблице $loop_dev"
 
-    sfdisk --force --quiet "$loop_dev" <"$dump_file"
-    rm -f "$dump_file"
-    trap - RETURN
+	sfdisk --force --quiet "$loop_dev" <"$dump_file"
+	rm -f "$dump_file"
+	trap - RETURN
 }
 
 disk::refresh_partitions() {
-    local loop_dev="$1"
+	local loop_dev="$1"
 
-    log::assert_not_empty "$loop_dev" "loop device"
+	log::assert_not_empty "$loop_dev" "loop device"
 
-    partprobe "$loop_dev" || true
-    partx -u "$loop_dev" || true
-    udevadm settle
+	partprobe "$loop_dev" || true
+	partx -u "$loop_dev" || true
+	udevadm settle
 }
 
 disk::shrink_image() {
-    local img_path="$1"
-    local loop_dev="$2"
-    local root_partition_number="$3"
-    local margin="$4"
-    local root_part=""
-    local layout=""
-    local start_sector=""
-    local current_size_sectors=""
-    local sector_size=""
-    local fs_size_bytes=""
-    local margin_bytes=""
-    local wanted_root_bytes=""
-    local wanted_root_sectors=""
-    local alignment_sectors=2048
-    local gpt_slack_sectors=2048
-    local final_image_sectors=""
-    local final_image_bytes=""
+	local img_path="$1"
+	local loop_dev="$2"
+	local root_partition_number="$3"
+	local margin="$4"
+	local root_part=""
+	local layout=""
+	local start_sector=""
+	local current_size_sectors=""
+	local sector_size=""
+	local fs_size_bytes=""
+	local margin_bytes=""
+	local wanted_root_bytes=""
+	local wanted_root_sectors=""
+	local alignment_sectors=2048
+	local gpt_slack_sectors=2048
+	local final_image_sectors=""
+	local final_image_bytes=""
 
-    log::assert_not_empty "$img_path" "путь к образу"
-    log::assert_not_empty "$loop_dev" "loop device"
-    log::assert_not_empty "$root_partition_number" "root partition number"
-    log::assert_not_empty "$margin" "shrink margin"
+	log::assert_not_empty "$img_path" "путь к образу"
+	log::assert_not_empty "$loop_dev" "loop device"
+	log::assert_not_empty "$root_partition_number" "root partition number"
+	log::assert_not_empty "$margin" "shrink margin"
 
-    disk::resolve_partition_path "$loop_dev" "$root_partition_number"
-    root_part="$RESOLVED_PARTITION_PATH"
+	disk::resolve_partition_path "$loop_dev" "$root_partition_number"
+	root_part="$RESOLVED_PARTITION_PATH"
 
-    log::info "Размонтирование файловых систем перед уменьшением образа..."
-    if [[ -n "${BUILD_MOUNT_ROOT:-}" ]] && mountpoint -q "$BUILD_MOUNT_ROOT"; then
-        if ! umount -R "$BUILD_MOUNT_ROOT" 2>/dev/null; then
-            log::warn "Размонтирование перед уменьшением не удалось, освобождаем занятые процессы..."
-            fuser -km "$BUILD_MOUNT_ROOT" 2>/dev/null || true
-            sleep 1
-            umount -R -l "$BUILD_MOUNT_ROOT" 2>/dev/null ||
-                log::die "Не удалось размонтировать $BUILD_MOUNT_ROOT перед уменьшением образа"
-        fi
-    fi
-    sync
+	log::info "Размонтирование файловых систем перед уменьшением образа..."
+	if [[ -n "${BUILD_MOUNT_ROOT:-}" ]] && mountpoint -q "$BUILD_MOUNT_ROOT"; then
+		if ! umount -R "$BUILD_MOUNT_ROOT" 2>/dev/null; then
+			log::warn "Размонтирование перед уменьшением не удалось, освобождаем занятые процессы..."
+			fuser -km "$BUILD_MOUNT_ROOT" 2>/dev/null || true
+			sleep 1
+			umount -R -l "$BUILD_MOUNT_ROOT" 2>/dev/null ||
+				log::die "Не удалось размонтировать $BUILD_MOUNT_ROOT перед уменьшением образа"
+		fi
+	fi
+	sync
 
-    log::info "Проверка и уменьшение ext4 root filesystem..."
-    e2fsck -fy "$root_part"
-    resize2fs -M "$root_part"
-    e2fsck -fy "$root_part"
+	log::info "Проверка и уменьшение ext4 root filesystem..."
+	e2fsck -fy "$root_part"
+	resize2fs -M "$root_part"
+	e2fsck -fy "$root_part"
 
-    layout="$(disk::partition_layout "$loop_dev" "$root_partition_number")"
-    read -r start_sector current_size_sectors sector_size <<<"$layout"
-    fs_size_bytes="$(disk::ext4_size_bytes "$root_part")"
-    margin_bytes="$(disk::size_to_bytes "$margin")"
-    wanted_root_bytes="$((fs_size_bytes + margin_bytes))"
-    wanted_root_sectors="$(disk::ceil_div "$wanted_root_bytes" "$sector_size")"
-    wanted_root_sectors="$(disk::ceil_div "$wanted_root_sectors" "$alignment_sectors")"
-    wanted_root_sectors="$((wanted_root_sectors * alignment_sectors))"
+	layout="$(disk::partition_layout "$loop_dev" "$root_partition_number")"
+	read -r start_sector current_size_sectors sector_size <<<"$layout"
+	fs_size_bytes="$(disk::ext4_size_bytes "$root_part")"
+	margin_bytes="$(disk::size_to_bytes "$margin")"
+	wanted_root_bytes="$((fs_size_bytes + margin_bytes))"
+	wanted_root_sectors="$(disk::ceil_div "$wanted_root_bytes" "$sector_size")"
+	wanted_root_sectors="$(disk::ceil_div "$wanted_root_sectors" "$alignment_sectors")"
+	wanted_root_sectors="$((wanted_root_sectors * alignment_sectors))"
 
-    if ((wanted_root_sectors >= current_size_sectors)); then
-        log::info "Root-раздел уже не требует уменьшения"
-        return 0
-    fi
+	if ((wanted_root_sectors >= current_size_sectors)); then
+		log::info "Root-раздел уже не требует уменьшения"
+		return 0
+	fi
 
-    log::info "Уменьшение root-раздела до ${wanted_root_sectors} секторов..."
-    disk::detach_partition_loops
-    disk::rewrite_partition_size "$loop_dev" "$root_partition_number" "$wanted_root_sectors"
-    disk::refresh_partitions "$loop_dev"
+	log::info "Уменьшение root-раздела до ${wanted_root_sectors} секторов..."
+	disk::detach_partition_loops
+	disk::rewrite_partition_size "$loop_dev" "$root_partition_number" "$wanted_root_sectors"
+	disk::refresh_partitions "$loop_dev"
 
-    final_image_sectors="$((start_sector + wanted_root_sectors + gpt_slack_sectors))"
-    final_image_bytes="$((final_image_sectors * sector_size))"
+	final_image_sectors="$((start_sector + wanted_root_sectors + gpt_slack_sectors))"
+	final_image_bytes="$((final_image_sectors * sector_size))"
 
-    log::info "Уменьшение файла образа до ${final_image_bytes} байт..."
-    truncate -s "$final_image_bytes" "$img_path"
-    sgdisk -e "$img_path" >/dev/null 2>&1 <<<""
-    losetup -c "$loop_dev"
-    disk::refresh_partitions "$loop_dev"
+	log::info "Уменьшение файла образа до ${final_image_bytes} байт..."
+	truncate -s "$final_image_bytes" "$img_path"
+	sgdisk -e "$img_path" >/dev/null 2>&1 <<<""
+	losetup -c "$loop_dev"
+	disk::refresh_partitions "$loop_dev"
 }
 
 disk::partition_simple() {
-    local target="$1"
-    log::assert_not_empty "$target" "целевое устройство/файл"
+	local target="$1"
+	log::assert_not_empty "$target" "целевое устройство/файл"
 
-    log::info "Создание таблицы разделов GPT на $target..."
+	log::info "Создание таблицы разделов GPT на $target..."
 
-    {
-        echo "label: gpt"
-        # 1-й раздел: 512МБ, Тип: EFI System Partition
-        echo "size=512M, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
-        # 2-й раздел: все остальное, Тип: Linux Root (ARM-64)
-        echo "type=B921B045-1DF0-41C3-AF44-4C6F280D3FAE"
-    } | sfdisk --force --wipe always --wipe-partitions always --quiet "$target" &>/dev/null
+	{
+		echo "label: gpt"
+		# 1-й раздел: 512МБ, Тип: EFI System Partition
+		echo "size=512M, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
+		# 2-й раздел: все остальное, Тип: Linux Root (ARM-64)
+		echo "type=B921B045-1DF0-41C3-AF44-4C6F280D3FAE"
+	} | sfdisk --force --wipe always --wipe-partitions always --quiet "$target" &>/dev/null
 
-    partprobe "$target"
+	partprobe "$target"
 }
 
 disk::map_loop() {
-    local img_path="$1"
-    log::assert_not_empty "$img_path" "путь к образу"
+	local img_path="$1"
+	log::assert_not_empty "$img_path" "путь к образу"
 
-    log::info "Подключение $img_path к loop-устройства..."
-    # -P читает таблицу разделов и создает /dev/loopXp1
-    CURRENT_LOOP_DEV=$(losetup --find -P --show "$img_path")
-    CURRENT_IMAGE_PATH="$img_path"
+	log::info "Подключение $img_path к loop-устройства..."
+	# -P читает таблицу разделов и создает /dev/loopXp1
+	CURRENT_LOOP_DEV=$(losetup --find -P --show "$img_path")
+	CURRENT_IMAGE_PATH="$img_path"
 
-    if [[ -z "$CURRENT_LOOP_DEV" ]]; then
-        log::die "Не удалось создать loop-устройство."
-    fi
-    log::success "$img_path подключен к устройству: $CURRENT_LOOP_DEV"
+	if [[ -z "$CURRENT_LOOP_DEV" ]]; then
+		log::die "Не удалось создать loop-устройство."
+	fi
+	log::success "$img_path подключен к устройству: $CURRENT_LOOP_DEV"
 }
 
 disk::format_partition() {
-    local part="$1"
-    local fs_type="$2" # По умолчанию ext4
+	local part="$1"
+	local fs_type="$2" # По умолчанию ext4
 
-    log::assert_not_empty "$part" "раздел для форматирования"
+	log::assert_not_empty "$part" "раздел для форматирования"
 
-    log::info "Форматирование $part в $fs_type..."
-    if [[ "$fs_type" == "vfat" ]]; then
-        if mkfs.vfat -F32 -n BOOT "$part" >/dev/null; then
-            log::info "Раздел $part отформатирован в $fs_type"
-        else
-            log::die "Не удалось отформатировать раздел $part в $fs_type"
-        fi
-    elif [[ "$fs_type" == "ext4" ]]; then
-        if mkfs.ext4 -q -L archlinux "$part" >/dev/null; then
-            log::info "Раздел $part отформатирован в $fs_type"
-        else
-            log::die "Не удалось отформатировать раздел $part в $fs_type"
-        fi
-    elif [[ "$fs_type" == "btrfs" ]]; then
-        if mkfs.btrfs -f -L archlinux "$part" >/dev/null; then
-            log::info "Раздел $part отформатирован в $fs_type"
-        else
-            log::die "Не удалось отформатировать раздел $part в $fs_type"
-        fi
-    fi
+	log::info "Форматирование $part в $fs_type..."
+	if [[ "$fs_type" == "vfat" ]]; then
+		if mkfs.vfat -F32 -n BOOT "$part" >/dev/null; then
+			log::info "Раздел $part отформатирован в $fs_type"
+		else
+			log::die "Не удалось отформатировать раздел $part в $fs_type"
+		fi
+	elif [[ "$fs_type" == "ext4" ]]; then
+		if mkfs.ext4 -q -L archlinux "$part" >/dev/null; then
+			log::info "Раздел $part отформатирован в $fs_type"
+		else
+			log::die "Не удалось отформатировать раздел $part в $fs_type"
+		fi
+	elif [[ "$fs_type" == "btrfs" ]]; then
+		if mkfs.btrfs -f -L archlinux "$part" >/dev/null; then
+			log::info "Раздел $part отформатирован в $fs_type"
+		else
+			log::die "Не удалось отформатировать раздел $part в $fs_type"
+		fi
+	fi
 
-    if udevadm settle; then
-        log::info "Информация о новом разделе $part сохранена"
-    else
-        log::die "Не удалось сохранить информацию о разделе $part"
-    fi
+	if udevadm settle; then
+		log::info "Информация о новом разделе $part сохранена"
+	else
+		log::die "Не удалось сохранить информацию о разделе $part"
+	fi
 
-    if sync; then
-        log::info "Запись данных на раздел $part заверешна"
-    else
-        log::die "Не удалось завершить запись на раздел $part"
-    fi
+	if sync; then
+		log::info "Запись данных на раздел $part заверешна"
+	else
+		log::die "Не удалось завершить запись на раздел $part"
+	fi
 
-    return 0
+	return 0
 }
 
 disk::mount_target() {
-    local source="$1"
-    local target="$2"
+	local source="$1"
+	local target="$2"
 
-    log::assert_not_empty "$source" "источник монтирования"
-    log::assert_not_empty "$target" "точка монтирования"
+	log::assert_not_empty "$source" "источник монтирования"
+	log::assert_not_empty "$target" "точка монтирования"
 
-    if [[ ! -d "$target" ]]; then
-        mkdir -p "$target"
-    fi
+	if [[ ! -d "$target" ]]; then
+		mkdir -p "$target"
+	fi
 
-    if mount "$source" "$target"; then
-        log::info "Смонтирован раздел $source в $target"
-    else
-        log::die "Не удалось смонтировать раздел $source в $target"
-    fi
+	if mount "$source" "$target"; then
+		log::info "Смонтирован раздел $source в $target"
+	else
+		log::die "Не удалось смонтировать раздел $source в $target"
+	fi
 }
 
 disk::btrfs_subvol_create_all() {
-    local mount_point="$1"
+	local mount_point="$1"
 
-    log::assert_not_empty "$mount_point" "временная точка монтирования btrfs"
+	log::assert_not_empty "$mount_point" "временная точка монтирования btrfs"
 
-    log::info "Создание btrfs subvolumes..."
-    local subvolumes=(
-        "@"
-        "@home"
-        "@snapshots"
-        "@swap"
-        "@var_log"
-        "@var_cache"
-        "@var_tmp"
-        "@var_lib"
-    )
-    local sv=""
-    for sv in "${subvolumes[@]}"; do
-        if btrfs subvolume create "$mount_point/$sv" >/dev/null; then
-            log::info "Создан subvolume: $sv"
-        else
-            log::die "Не удалось создать subvolume: $sv"
-        fi
-    done
-    log::success "Subvolumes созданы"
+	log::info "Создание btrfs subvolumes..."
+	local subvolumes=(
+		"@"
+		"@home"
+		"@snapshots"
+		"@swap"
+		"@var_log"
+		"@var_cache"
+		"@var_tmp"
+	)
+	local sv=""
+	for sv in "${subvolumes[@]}"; do
+		if btrfs subvolume create "$mount_point/$sv" >/dev/null; then
+			log::info "Создан subvolume: $sv"
+		else
+			log::die "Не удалось создать subvolume: $sv"
+		fi
+	done
+	log::success "Subvolumes созданы"
 }
 
 disk::btrfs_mount_subvol_root() {
-    local dev="$1"
-    local target="$2"
+	local dev="$1"
+	local target="$2"
 
-    log::assert_not_empty "$dev" "устройство"
-    log::assert_not_empty "$target" "точка монтирования"
+	log::assert_not_empty "$dev" "устройство"
+	log::assert_not_empty "$target" "точка монтирования"
 
-    [[ -d "$target" ]] || mkdir -p "$target"
+	[[ -d "$target" ]] || mkdir -p "$target"
 
-    if mount -o subvol=@,compress=zstd,noatime "$dev" "$target"; then
-        log::info "@ смонтирован в $target"
-    else
-        log::die "Не удалось смонтировать @ в $target"
-    fi
+	if mount -o subvol=@,compress=zstd,noatime "$dev" "$target"; then
+		log::info "@ смонтирован в $target"
+	else
+		log::die "Не удалось смонтировать @ в $target"
+	fi
 }
 
 disk::btrfs_mount_subvol() {
-    local dev="$1"
-    local subvol="$2"
-    local target="$3"
-    local options="${4:-defaults}"
+	local dev="$1"
+	local subvol="$2"
+	local target="$3"
+	local options="${4:-defaults}"
 
-    log::assert_not_empty "$dev" "устройство"
-    log::assert_not_empty "$subvol" "subvolume"
-    log::assert_not_empty "$target" "точка монтирования"
+	log::assert_not_empty "$dev" "устройство"
+	log::assert_not_empty "$subvol" "subvolume"
+	log::assert_not_empty "$target" "точка монтирования"
 
-    [[ -d "$target" ]] || mkdir -p "$target"
+	[[ -d "$target" ]] || mkdir -p "$target"
 
-    if mount -o "subvol=$subvol,$options" "$dev" "$target"; then
-        log::info "$subvol смонтирован в $target ($options)"
-    else
-        log::die "Не удалось смонтировать $subvol в $target"
-    fi
+	if mount -o "subvol=$subvol,$options" "$dev" "$target"; then
+		log::info "$subvol смонтирован в $target ($options)"
+	else
+		log::die "Не удалось смонтировать $subvol в $target"
+	fi
 }
 
 disk::cleanup() {
-    local mount_point="$1"
-    local partition_loop_dev=""
+	local mount_point="$1"
+	local partition_loop_dev=""
 
-    log::assert_not_empty "$mount_point" "источник монтирования"
+	log::assert_not_empty "$mount_point" "источник монтирования"
 
-    sync
-    log::info "Запись данных на раздел $mount_point завершена"
+	sync
+	log::info "Запись данных на раздел $mount_point завершена"
 
-    if [[ -n "$mount_point" ]] && mountpoint -q "$mount_point"; then
-        log::info "Размонтирование $mount_point..."
+	if [[ -n "$mount_point" ]] && mountpoint -q "$mount_point"; then
+		log::info "Размонтирование $mount_point..."
 
-        # -R размонтирует вложенные точки, включая boot-раздел.
-        if ! umount -R "$mount_point" 2>/dev/null; then
-            log::warn "Стандартное размонтирование не удалось, применяем силу..."
-            # 2. Убиваем процессы, которые держат папку (требует psmisc / fuser)
-            fuser -km "$mount_point" 2>/dev/null || true
-            sleep 1
+		# -R размонтирует вложенные точки, включая boot-раздел.
+		if ! umount -R "$mount_point" 2>/dev/null; then
+			log::warn "Стандартное размонтирование не удалось, применяем силу..."
+			# 2. Убиваем процессы, которые держат папку (требует psmisc / fuser)
+			fuser -km "$mount_point" 2>/dev/null || true
+			sleep 1
 
-            # 3. Ленивое размонтирование (отключает ФС немедленно, очищает позже)
-            umount -R -l "$mount_point" 2>/dev/null || true
-        fi
-    fi
+			# 3. Ленивое размонтирование (отключает ФС немедленно, очищает позже)
+			umount -R -l "$mount_point" 2>/dev/null || true
+		fi
+	fi
 
-    sync
+	sync
 
-    for partition_loop_dev in "${PARTITION_LOOP_DEVS[@]:-}"; do
-        if [[ -n "$partition_loop_dev" ]]; then
-            log::info "Отключение устройства раздела $partition_loop_dev..."
-            losetup -d "$partition_loop_dev" 2>/dev/null ||
-                log::warn "Не удалось освободить $partition_loop_dev"
-        fi
-    done
-    PARTITION_LOOP_DEVS=()
+	for partition_loop_dev in "${PARTITION_LOOP_DEVS[@]:-}"; do
+		if [[ -n "$partition_loop_dev" ]]; then
+			log::info "Отключение устройства раздела $partition_loop_dev..."
+			losetup -d "$partition_loop_dev" 2>/dev/null ||
+				log::warn "Не удалось освободить $partition_loop_dev"
+		fi
+	done
+	PARTITION_LOOP_DEVS=()
 
-    if [[ -n "$CURRENT_LOOP_DEV" ]]; then
-        log::info "Отключение устройства $CURRENT_LOOP_DEV..."
-        # Ждем секунду, чтобы ядро успело освободить дескрипторы
-        sleep 1
-        losetup -d "$CURRENT_LOOP_DEV" 2>/dev/null ||
-            log::warn "Не удалось освободить $CURRENT_LOOP_DEV (возможно, занято ядром)"
-        CURRENT_LOOP_DEV=""
-    fi
+	if [[ -n "$CURRENT_LOOP_DEV" ]]; then
+		log::info "Отключение устройства $CURRENT_LOOP_DEV..."
+		# Ждем секунду, чтобы ядро успело освободить дескрипторы
+		sleep 1
+		losetup -d "$CURRENT_LOOP_DEV" 2>/dev/null ||
+			log::warn "Не удалось освободить $CURRENT_LOOP_DEV (возможно, занято ядром)"
+		CURRENT_LOOP_DEV=""
+	fi
+}
+
+disk::luks_format() {
+	local device="$1"
+	local password="$2"
+
+	log::assert_not_empty "$device" "устройство"
+	log::assert_not_empty "$password" "пароль LUKS"
+
+	log::info "Форматирование LUKS-контейнера на $device..."
+	echo -n "$password" | cryptsetup luksFormat --type luks2 "$device" - 2>&1 ||
+		log::die "Не удалось создать LUKS-контейнер"
+	log::success "LUKS-контейнер создан"
+}
+
+disk::luks_open() {
+	local device="$1"
+	local name="$2"
+	local password="$3"
+
+	log::assert_not_empty "$device" "устройство"
+	log::assert_not_empty "$name" "имя mapper"
+
+	log::info "Открытие LUKS-контейнера $device как /dev/mapper/$name..."
+	if [[ -e "/dev/mapper/$name" ]]; then
+		cryptsetup close "$name" 2>/dev/null || true
+	fi
+	echo -n "$password" | cryptsetup open "$device" "$name" - 2>&1 ||
+		log::die "Не удалось открыть LUKS-контейнер"
+	log::success "/dev/mapper/$name открыт"
+}
+
+disk::luks_close() {
+	local name="$1"
+
+	log::assert_not_empty "$name" "имя mapper"
+
+	if [[ -e "/dev/mapper/$name" ]]; then
+		cryptsetup close "$name" 2>&1 || log::warn "Не удалось закрыть /dev/mapper/$name"
+	fi
 }

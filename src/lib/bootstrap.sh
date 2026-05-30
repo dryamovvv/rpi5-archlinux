@@ -116,13 +116,12 @@ bootstrap::generate_btrfs_fstab() {
 	log::info "Генерация /etc/fstab для btrfs subvolume layout..."
 	cat <<EOF >"$target/etc/fstab"
 # /etc/fstab — btrfs subvolume layout
-UUID=$root_uuid /          btrfs rw,noatime,compress=zstd,subvol=@       0 0
+UUID=$root_uuid /          btrfs rw,noatime,compress=zstd,x-systemd.device-timeout=90,subvol=@       0 0
 UUID=$root_uuid /home      btrfs rw,noatime,compress=zstd,subvol=@home    0 0
 UUID=$root_uuid /.snapshots btrfs rw,noatime,subvol=@snapshots            0 0
 UUID=$root_uuid /var/log   btrfs rw,noatime,compress=zstd,subvol=@var_log 0 0
 UUID=$root_uuid /var/cache btrfs rw,noatime,nodatacow,subvol=@var_cache   0 0
 UUID=$root_uuid /var/tmp   btrfs rw,noatime,nodatacow,subvol=@var_tmp     0 0
-UUID=$root_uuid /var/lib   btrfs rw,noatime,nodatacow,subvol=@var_lib     0 0
 UUID=$root_uuid /swap      btrfs rw,noatime,nodatacow,subvol=@swap        0 0
 UUID=$boot_uuid /boot      vfat defaults,noatime,nofail                    0 0
 EOF
@@ -227,15 +226,26 @@ bootstrap::cmdline_txt() {
 	assets::write "boot/cmdline.txt" "$target/cmdline.txt"
 
 	if [[ -n "${BUILD_ROOT_UUID:-}" ]]; then
-		sed -i "s/__ROOT_UUID__/$BUILD_ROOT_UUID/" "$target/cmdline.txt"
-		log::info "cmdline.txt: root=UUID=$BUILD_ROOT_UUID"
+		# LUKS keyboard mode: rd.luks.name only (no ip=dhcp)
+		if [[ "${BUILD_ENABLE_ENCRYPTION:-0}" == "1" ]] && [[ -n "${LUKS_UUID:-}" ]]; then
+			sed -i "1s/__ROOT_UUID__/$BUILD_ROOT_UUID/" "$target/cmdline.txt"
+			if [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" == "ssh" ]] || [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" == "telegram" ]]; then
+				sed -i "1s/^/rd.luks.name=$LUKS_UUID=cryptroot ip=dhcp /" "$target/cmdline.txt"
+			else
+				sed -i "1s/^/rd.luks.name=$LUKS_UUID=cryptroot /" "$target/cmdline.txt"
+			fi
+			log::info "cmdline.txt: rd.luks.name=$LUKS_UUID=cryptroot root=UUID=$BUILD_ROOT_UUID ($BUILD_LUKS_UNLOCK_MODE mode)"
+		else
+			sed -i "1s/__ROOT_UUID__/$BUILD_ROOT_UUID/" "$target/cmdline.txt"
+			log::info "cmdline.txt: root=UUID=$BUILD_ROOT_UUID"
+		fi
 	else
 		log::warn "BUILD_ROOT_UUID не задан — cmdline.txt содержит плейсхолдер __ROOT_UUID__"
 	fi
 
 	if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
-		sed -i 's/ fsck.repair=yes//' "$target/cmdline.txt"
-		sed -i 's/$/ rootflags=subvol=@/' "$target/cmdline.txt"
+		sed -i '1s/ fsck.repair=yes//' "$target/cmdline.txt"
+		sed -i '1s/$/ rootflags=subvol=@/' "$target/cmdline.txt"
 		log::info "cmdline.txt: добавлен rootflags=subvol=@"
 	fi
 
@@ -267,14 +277,33 @@ bootstrap::mkinitcpio_conf() {
 	log::assert_not_empty "$new_hooks" "новая строка HOOKS"
 	log::info "Обновляем $target/etc/mkinitcpio.conf..."
 
+	local modules="vfat"
+
 	if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
 		new_hooks="${new_hooks//fsck /}"
 		new_hooks="${new_hooks// fsck)/)}"
-		sed -i 's/^MODULES=(.*/MODULES=(vfat btrfs)/' "$target/etc/mkinitcpio.conf"
-	else
-		sed -i 's/^MODULES=(.*/MODULES=(vfat)/' "$target/etc/mkinitcpio.conf"
+		modules="vfat btrfs"
 	fi
 
+	# LUKS: sd-encrypt before filesystems
+	#   keyboard: sd-encrypt only
+	#   ssh:      sd-network + sd-tinyssh + sd-encrypt
+	#   telegram: sd-network + telegram-unlock + sd-encrypt
+	if [[ "${BUILD_ENABLE_ENCRYPTION:-0}" == "1" ]]; then
+		modules="$modules dm_crypt"
+		new_hooks="${new_hooks//filesystems /sd-encrypt filesystems }"
+		if [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" == "ssh" ]]; then
+			new_hooks="${new_hooks//sd-encrypt /sd-network sd-tinyssh sd-encrypt }"
+			log::info "mkinitcpio: LUKS hooks (sd-network, sd-tinyssh, sd-encrypt, dm_crypt)"
+		elif [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" == "telegram" ]]; then
+			new_hooks="${new_hooks//sd-encrypt /sd-network telegram-unlock sd-encrypt }"
+			log::info "mkinitcpio: LUKS hooks (sd-network, telegram-unlock, sd-encrypt, dm_crypt)"
+		else
+			log::info "mkinitcpio: LUKS hooks (sd-encrypt, dm_crypt) — keyboard mode"
+		fi
+	fi
+
+	sed -i "s/^MODULES=(.*/MODULES=($modules)/" "$target/etc/mkinitcpio.conf"
 	sed -i "s/^HOOKS=(.*/$new_hooks/" "$target/etc/mkinitcpio.conf"
 	sed -i 's/^COMPRESSION="zstd"/#COMPRESSION="zstd"/' "$target/etc/mkinitcpio.conf"
 	if [[ -n "${BUILD_MKINITCPIO_COMPRESSION:-}" ]]; then
@@ -327,14 +356,26 @@ bootstrap::enable_wheel_sudo() {
 
 bootstrap::sshd() {
 	local target="$1"
-	local ssh_user="$2"
+	local ssh_user="${2:-}"
 	local extra_users="${3:-}"
 	log::assert_not_empty "$target" "точка монтирования"
-	log::assert_not_empty "$ssh_user" "пользователь ssh"
 
 	log::info "Настраиваем sshd"
-	echo "PermitRootLogin yes" >>"$target/etc/ssh/sshd_config"
-	echo "AllowUsers root $ssh_user $extra_users" >>"$target/etc/ssh/sshd_config"
+	echo "PermitRootLogin ${BUILD_SSH_PERMIT_ROOT_LOGIN:-yes}" >>"$target/etc/ssh/sshd_config"
+
+	local allow_users="root"
+	[[ -n "$ssh_user" ]] && allow_users+=" $ssh_user"
+	[[ -n "$extra_users" ]] && allow_users+=" $extra_users"
+	echo "AllowUsers $allow_users" >>"$target/etc/ssh/sshd_config"
+
+	if [[ -n "${BUILD_ROOT_SSH_KEY:-}" ]]; then
+		mkdir -p "$target/root/.ssh"
+		chmod 700 "$target/root/.ssh"
+		echo "$BUILD_ROOT_SSH_KEY" >"$target/root/.ssh/authorized_keys"
+		chmod 600 "$target/root/.ssh/authorized_keys"
+		log::info "Root SSH key installed"
+	fi
+
 	bootstrap::systemd_enable_unit "$target" "sshd.service" "multi-user.target.wants"
 }
 
@@ -401,8 +442,12 @@ bootstrap::btrfs_setup_snapper() {
 
 	local snap_mount="$target/.snapshots"
 	local root_part=""
-	disk::resolve_partition_path "$CURRENT_LOOP_DEV" 2
-	root_part="$RESOLVED_PARTITION_PATH"
+	if [[ -n "${CRYPTROOT_DEVICE:-}" ]]; then
+		root_part="/dev/mapper/cryptroot"
+	else
+		disk::resolve_partition_path "$CURRENT_LOOP_DEV" 2
+		root_part="$RESOLVED_PARTITION_PATH"
+	fi
 
 	if mountpoint -q "$snap_mount" 2>/dev/null; then
 		umount "$snap_mount"
@@ -436,9 +481,35 @@ EMPTY_PRE_POST_CLEANUP="yes"
 EMPTY_PRE_POST_MIN_AGE="1800"
 SNAPCONF
 
+	cat >"$target/etc/snapper/configs/home" <<'SNAPCONF'
+SUBVOLUME="/home"
+FSTYPE="btrfs"
+QGROUP=""
+SPACE_LIMIT="0.5"
+FREE_LIMIT="0.2"
+ALLOW_USERS=""
+ALLOW_GROUPS=""
+SYNC_ACL="no"
+BACKGROUND_COMPARISON="yes"
+NUMBER_CLEANUP="yes"
+NUMBER_MIN_AGE="1800"
+NUMBER_LIMIT="50"
+NUMBER_LIMIT_IMPORTANT="10"
+TIMELINE_CREATE="yes"
+TIMELINE_CLEANUP="yes"
+TIMELINE_MIN_AGE="1800"
+TIMELINE_LIMIT_HOURLY="3"
+TIMELINE_LIMIT_DAILY="7"
+TIMELINE_LIMIT_WEEKLY="4"
+TIMELINE_LIMIT_MONTHLY="3"
+TIMELINE_LIMIT_YEARLY="2"
+EMPTY_PRE_POST_CLEANUP="yes"
+EMPTY_PRE_POST_MIN_AGE="1800"
+SNAPCONF
+
 	# Register config in /etc/conf.d/snapper (snapper create-config does this)
 	if [[ -f "$target/etc/conf.d/snapper" ]]; then
-		sed -i 's/SNAPPER_CONFIGS=""/SNAPPER_CONFIGS="root"/' "$target/etc/conf.d/snapper"
+		sed -i 's/SNAPPER_CONFIGS=""/SNAPPER_CONFIGS="root home"/' "$target/etc/conf.d/snapper"
 	fi
 
 	if btrfs subvolume delete "$target/.snapshots" >/dev/null 2>&1; then
@@ -549,7 +620,7 @@ bootstrap::mcp_server() {
 	api_key=$(python3 -c "import uuid; print(uuid.uuid4())")
 	mkdir -p "$target/etc/arch-ops-mcp"
 	cat >"$target/etc/arch-ops-mcp/env" <<EOF
-ARCH_OPS_SERVER_BIND=0.0.0.0
+ARCH_OPS_SERVER_BIND=127.0.0.1
 ARCH_OPS_SERVER_API_KEY=$api_key
 EOF
 	chmod 600 "$target/etc/arch-ops-mcp/env"
@@ -562,4 +633,52 @@ EOF
 	bootstrap::systemd_enable_custom_unit "$target" "arch-ops-mcp.service" "multi-user.target.wants"
 
 	log::info "arch-ops-server (MCP) configured"
+}
+
+bootstrap::luks_initramfs() {
+	local target="$1"
+	log::assert_not_empty "$target" "точка монтирования"
+
+	local unlock_mode="${BUILD_LUKS_UNLOCK_MODE:-keyboard}"
+
+	if [[ "$unlock_mode" == "keyboard" ]]; then
+		log::info "LUKS: keyboard mode — skipping initramfs extras"
+		return 0
+	fi
+
+	if [[ "$unlock_mode" == "telegram" ]]; then
+		log::info "Настройка LUKS Telegram unlock..."
+		mkdir -p "$target/etc/initcpio/install" "$target/etc/initcpio/hooks"
+		assets::write "initcpio/install/telegram-unlock" "$target/etc/initcpio/install/telegram-unlock"
+		chmod 0644 "$target/etc/initcpio/install/telegram-unlock"
+		assets::write "initcpio/hooks/telegram-unlock" "$target/etc/initcpio/hooks/telegram-unlock"
+		chmod 0644 "$target/etc/initcpio/hooks/telegram-unlock"
+		sed -i "s|__BOT_TOKEN__|${BUILD_TELEGRAM_BOT_TOKEN}|g" "$target/etc/initcpio/hooks/telegram-unlock"
+		sed -i "s|__CHAT_ID__|${BUILD_TELEGRAM_CHAT_ID}|g" "$target/etc/initcpio/hooks/telegram-unlock"
+		sed -i "s|__LUKS_UUID__|${LUKS_UUID}|g" "$target/etc/initcpio/hooks/telegram-unlock"
+		log::info "Telegram unlock hook installed"
+		return 0
+	fi
+
+	log::info "Настройка LUKS remote SSH unlock (sd-tinyssh)..."
+
+	arch-chroot "$target" pacman -Sy --noconfirm tinyssh 2>&1 || true
+
+	mkdir -p "$target/etc/tinyssh"
+	if [[ -z "$(ls -A "$target/etc/tinyssh" 2>/dev/null)" ]]; then
+		arch-chroot "$target" tinysshd-makekey "$target/etc/tinyssh/sshkeydir" 2>&1 || true
+	fi
+
+	if [[ -d "$target/root/.ssh" ]]; then
+		cp "$target/root/.ssh/authorized_keys" "$target/etc/tinyssh/root_key" 2>/dev/null || true
+	fi
+
+	local aur_pkg_url="${BUILD_AUR_PKG_URL:-}"
+	if [[ -n "$aur_pkg_url" ]]; then
+		log::info "Downloading pre-built mkinitcpio-systemd-extras..."
+		arch-chroot "$target" bash -c "curl -fL $aur_pkg_url -o /tmp/mkinitcpio-systemd-extras.pkg.tar.zst && pacman -U --noconfirm /tmp/mkinitcpio-systemd-extras.pkg.tar.zst" 2>&1 ||
+			log::warn "mkinitcpio-systemd-extras installation failed — remote SSH unlock may not work"
+	fi
+
+	log::info "LUKS remote unlock configured"
 }

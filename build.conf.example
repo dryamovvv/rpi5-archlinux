@@ -20,8 +20,12 @@ BUILD_QEMU_KERNEL_CMDLINE="root=/dev/vda2 rw rootwait console=ttyAMA0"
 BUILD_QEMU_ROOTFLAGS="subvol=@"
 
 BUILD_HOSTNAME="archlinux-develop"
-# SSH пользователь для AllowUsers (root всегда разрешён)
-BUILD_SSH_USER="user"
+# SSH пользователь для AllowUsers (root всегда разрешён); пусто = только root
+BUILD_SSH_USER=""
+# PermitRootLogin: yes (password+key, default) | prohibit-password (key only) | no
+BUILD_SSH_PERMIT_ROOT_LOGIN="yes"
+# Публичный SSH-ключ для root (нужен при PermitRootLogin prohibit-password)
+BUILD_ROOT_SSH_KEY=""
 # Дополнительные пользователи для AllowUsers (через пробел), оставить пустым если не нужны
 BUILD_SSH_ALLOW_USERS=""
 BUILD_ROOT_PASSWORD="root"
@@ -40,6 +44,24 @@ BUILD_ZRAM_SIZE="2048"
 BUILD_SWAPFILE_SIZE="16G"
 # Wi-Fi support: 0=disabled, 1=enable wpa_supplicant and remove disable-wifi overlay
 BUILD_ENABLE_WIFI=0
+# Firewall (nftables): 1=enabled (default), 0=disabled — SSH+80+443+estab+lo, rest denied
+BUILD_ENABLE_FIREWALL=1
+# Periodic TRIM for NVMe/SSD (fstrim.timer): 1=enabled (default), 0=disabled
+# BTRFS discard=async is kernel default since 6.2 — fstrim is complementary, not replacement
+BUILD_ENABLE_FSTRIM=1
+# Disk encryption via LUKS (btrfs only): 1=enabled, 0=disabled (default)
+# WARNING: requires pre-built mkinitcpio-systemd-extras AUR package at BUILD_AUR_PKG_URL
+BUILD_ENABLE_ENCRYPTION=0
+# LUKS passphrase for disk encryption (required when BUILD_ENABLE_ENCRYPTION=1)
+BUILD_LUKS_PASSWORD=""
+# LUKS unlock mode: "keyboard" (local console, default), "ssh" (remote via tinysshd in initramfs)
+# or "telegram" (poll Telegram Bot API for passphrase — requires BUILD_TELEGRAM_BOT_TOKEN + BUILD_TELEGRAM_CHAT_ID)
+BUILD_LUKS_UNLOCK_MODE="keyboard"
+# URL to pre-built mkinitcpio-systemd-extras AUR package (*.pkg.tar.zst) — required for ssh mode
+BUILD_AUR_PKG_URL=""
+# Telegram Bot API credentials for LUKS unlock (required when BUILD_LUKS_UNLOCK_MODE=telegram)
+BUILD_TELEGRAM_BOT_TOKEN=""
+BUILD_TELEGRAM_CHAT_ID=""
 
 BUILD_MODULES=(
     "disk_image"
@@ -76,7 +98,6 @@ BUILD_PACKAGES=(
     "cpupower"
     "rng-tools"
     # Network & security
-    "iptables-nft"
     "fail2ban"
     "wpa_supplicant"
     "avahi"
@@ -93,6 +114,7 @@ BUILD_PACKAGES=(
     "btrfs-progs"
     "snapper"
     "snap-pac"
+    "btrbk"
     "inetutils"
     "which"
     "pacman-contrib"
@@ -101,6 +123,15 @@ BUILD_PACKAGES=(
     # MCP server (uvx arch-ops-server) for remote AI diagnostics
     "uv"
 )
+
+# Journal gateway (HTTP logs on port 19531): 1=enabled (default), 0=disabled
+# WARNING: port 19531 is world-readable — disable on internet-facing hosts
+BUILD_ENABLE_JOURNAL_GATEWAY=1
+# MCP server (arch-ops-server on port 8080, Bearer auth): 1=enabled (default), 0=disabled
+BUILD_ENABLE_MCP_SERVER=1
+
+# Firewall (nftables): 1=enabled (default), 0=disabled. Allows SSH+HTTP+HTTPS, drops rest.
+BUILD_ENABLE_FIREWALL=1
 
 # EEPROM update channel: "default" (stable) or "latest" (newer, +performance)
 BUILD_EEPROM_CHANNEL="latest"
@@ -134,7 +165,6 @@ BUILD_QEMU_PACKAGES=(
     "cpupower"
     "rng-tools"
     # Network & security
-    "iptables-nft"
     "fail2ban"
     "wpa_supplicant"
     "avahi"
@@ -148,6 +178,7 @@ BUILD_QEMU_PACKAGES=(
     "btrfs-progs"
     "snapper"
     "snap-pac"
+    "btrbk"
     # ZRAM swap compression
     "zram-generator"
     # MCP server (uvx arch-ops-server) for remote AI diagnostics

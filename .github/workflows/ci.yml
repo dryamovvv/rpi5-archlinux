@@ -58,7 +58,7 @@ jobs:
           ./dist/bin/rpi5-archlinux-image validate
 
   build-arm:
-    if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/homectl_feature'
+    if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/homectl_feature' || github.ref == 'refs/heads/btrbk-luks-fstrim'
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
@@ -70,6 +70,7 @@ jobs:
           sudo apt-get install -y \
             arch-install-scripts \
             aria2 \
+            cryptsetup-bin \
             dosfstools \
             e2fsprogs \
             pacman-package-manager \
@@ -83,9 +84,12 @@ jobs:
       - name: Package builder
         run: |
           cp build.conf.example build.conf
-          # Fast dev build: no compression, no shrink
           echo 'BUILD_MKINITCPIO_COMPRESSION="cat"' >> build.conf
-          echo 'BUILD_SHRINK_IMAGE=0' >> build.conf
+          if [[ "${{ github.ref }}" == "refs/heads/btrbk-luks-fstrim" ]]; then
+            echo 'BUILD_ENABLE_ENCRYPTION=1' >> build.conf
+            echo 'BUILD_LUKS_PASSWORD="ci-test"' >> build.conf
+            echo "BUILD_AUR_PKG_URL=${{ github.server_url }}/${{ github.repository }}/raw/${{ github.ref_name }}/aur/mkinitcpio-systemd-extras-0.10-1-any.pkg.tar.xz" >> build.conf
+          fi
           ./scripts/package.sh
 
       - name: Build Arch Linux image
@@ -112,11 +116,14 @@ jobs:
             echo "ERROR: unresolved __ROOT_UUID__ placeholder"
             exit 1
           fi
-          if ! grep -qP 'root=UUID=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$tmp_boot/cmdline.txt"; then
-            echo "ERROR: no valid root=UUID= in cmdline.txt"
+          if grep -qP 'root=UUID=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$tmp_boot/cmdline.txt"; then
+            echo "OK: UUID substitution verified"
+          elif grep -qP 'rd\.luks\.name=[0-9a-f-]+=cryptroot' "$tmp_boot/cmdline.txt"; then
+            echo "OK: LUKS encryption enabled, rd.luks.name found"
+          else
+            echo "ERROR: no valid root=UUID= or rd.luks.name in cmdline.txt"
             exit 1
           fi
-          echo "OK: UUID substitution verified"
 
       - name: Validate config.txt
         run: |
@@ -128,6 +135,13 @@ jobs:
             exit 1
           fi
           echo "OK: config.txt validated"
+
+      - name: Validate LUKS (encrypted builds only)
+        if: github.ref == 'refs/heads/btrbk-luks-fstrim'
+        run: |
+          LOOP="$(sudo losetup -fP --show dist/images/archlinux-rpi5-aarch64.img)"
+          sudo cryptsetup isLuks "${LOOP}p2" && echo "LUKS: OK" || { echo "LUKS: FAIL"; exit 1; }
+          sudo losetup -d "$LOOP"
 
       - name: Compress image
         run: |
