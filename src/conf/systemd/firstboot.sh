@@ -28,25 +28,16 @@ if ! id -u "$USER_NAME" >/dev/null 2>&1; then
 	fi
 
 	if [[ $CREATED -eq 0 ]]; then
-		if [[ -t 0 ]]; then
-			log "interactive TTY detected, running homectl firstboot"
-			homectl firstboot --prompt-new-user --prompt-shell=no --prompt-groups=no --mute-console=yes
-			USER_NAME=$(homectl list -j 2>/dev/null | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-print(data[0]['userName'] if data else '')" 2>/dev/null)
-		else
-			log "headless mode — creating user via useradd (no homed)"
-			useradd -m -G wheel "$USER_NAME"
-			if [[ -f "$IDENTITY_FILE" ]]; then
-				chpasswd -e <<<"${USER_NAME}:$(python3 -c "
+		log "homectl failed — creating user via useradd"
+		useradd -m -G wheel "$USER_NAME"
+		if [[ -f "$IDENTITY_FILE" ]]; then
+			chpasswd -e <<<"${USER_NAME}:$(python3 -c "
 import json
 d = json.load(open('$IDENTITY_FILE'))
 print(d['privileged']['hashedPassword'][0])
 ")"
-			else
-				passwd -d "$USER_NAME"
-			fi
+		else
+			passwd -d "$USER_NAME"
 		fi
 	fi
 fi
