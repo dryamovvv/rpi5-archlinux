@@ -565,6 +565,9 @@ disk::luks_open() {
 	log::assert_not_empty "$name" "имя mapper"
 
 	log::info "Открытие LUKS-контейнера $device как /dev/mapper/$name..."
+	if [[ -e "/dev/mapper/$name" ]]; then
+		cryptsetup close "$name" 2>/dev/null || true
+	fi
 	echo -n "$password" | cryptsetup open "$device" "$name" - 2>&1 ||
 		log::die "Не удалось открыть LUKS-контейнер"
 	log::success "/dev/mapper/$name открыт"
