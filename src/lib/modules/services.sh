@@ -69,5 +69,7 @@ services::configure_services() {
 EOF
 	fi
 
-	bootstrap::mcp_server "$BUILD_MOUNT_ROOT"
+	if [[ "${BUILD_ENABLE_MCP_SERVER:-1}" == "1" ]]; then
+		bootstrap::mcp_server "$BUILD_MOUNT_ROOT"
+	fi
 }

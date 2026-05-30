@@ -105,6 +105,8 @@ BUILD_PACKAGES=(
 # Journal gateway (HTTP logs on port 19531): 1=enabled (default), 0=disabled
 # WARNING: port 19531 is world-readable — disable on internet-facing hosts
 BUILD_ENABLE_JOURNAL_GATEWAY=1
+# MCP server (arch-ops-server on port 8080, Bearer auth): 1=enabled (default), 0=disabled
+BUILD_ENABLE_MCP_SERVER=1
 
 # EEPROM update channel: "default" (stable) or "latest" (newer, +performance)
 BUILD_EEPROM_CHANNEL="latest"
