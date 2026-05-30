@@ -227,11 +227,11 @@ bootstrap::cmdline_txt() {
 
 	if [[ -n "${BUILD_ROOT_UUID:-}" ]]; then
 		if [[ "${BUILD_ENABLE_ENCRYPTION:-0}" == "1" ]] && [[ -n "${LUKS_UUID:-}" ]]; then
-			sed -i "s/__ROOT_UUID__/$BUILD_ROOT_UUID/" "$target/cmdline.txt"
-			sed -i "s/^/rd.luks.name=$LUKS_UUID=cryptroot ip=dhcp /" "$target/cmdline.txt"
+			sed -i "1s/__ROOT_UUID__/$BUILD_ROOT_UUID/" "$target/cmdline.txt"
+			sed -i "1s/^/rd.luks.name=$LUKS_UUID=cryptroot ip=dhcp /" "$target/cmdline.txt"
 			log::info "cmdline.txt: rd.luks.name=$LUKS_UUID=cryptroot root=UUID=$BUILD_ROOT_UUID"
 		else
-			sed -i "s/__ROOT_UUID__/$BUILD_ROOT_UUID/" "$target/cmdline.txt"
+			sed -i "1s/__ROOT_UUID__/$BUILD_ROOT_UUID/" "$target/cmdline.txt"
 			log::info "cmdline.txt: root=UUID=$BUILD_ROOT_UUID"
 		fi
 	else
@@ -239,8 +239,8 @@ bootstrap::cmdline_txt() {
 	fi
 
 	if [[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]]; then
-		sed -i 's/ fsck.repair=yes//' "$target/cmdline.txt"
-		sed -i 's/$/ rootflags=subvol=@/' "$target/cmdline.txt"
+		sed -i '1s/ fsck.repair=yes//' "$target/cmdline.txt"
+		sed -i '1s/$/ rootflags=subvol=@/' "$target/cmdline.txt"
 		log::info "cmdline.txt: добавлен rootflags=subvol=@"
 	fi
 
