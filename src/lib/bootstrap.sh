@@ -229,7 +229,7 @@ bootstrap::cmdline_txt() {
 		# LUKS keyboard mode: rd.luks.name only (no ip=dhcp)
 		if [[ "${BUILD_ENABLE_ENCRYPTION:-0}" == "1" ]] && [[ -n "${LUKS_UUID:-}" ]]; then
 			sed -i "1s/__ROOT_UUID__/$BUILD_ROOT_UUID/" "$target/cmdline.txt"
-			if [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" == "ssh" ]]; then
+			if [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" == "ssh" ]] || [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" == "telegram" ]]; then
 				sed -i "1s/^/rd.luks.name=$LUKS_UUID=cryptroot ip=dhcp /" "$target/cmdline.txt"
 			else
 				sed -i "1s/^/rd.luks.name=$LUKS_UUID=cryptroot /" "$target/cmdline.txt"
@@ -285,13 +285,19 @@ bootstrap::mkinitcpio_conf() {
 		modules="vfat btrfs"
 	fi
 
-	# LUKS: sd-encrypt before filesystems. ssh mode also adds sd-network + sd-tinyssh
+	# LUKS: sd-encrypt before filesystems
+	#   keyboard: sd-encrypt only
+	#   ssh:      sd-network + sd-tinyssh + sd-encrypt
+	#   telegram: sd-network + telegram-unlock + sd-encrypt
 	if [[ "${BUILD_ENABLE_ENCRYPTION:-0}" == "1" ]]; then
 		modules="$modules dm_crypt"
 		new_hooks="${new_hooks//filesystems /sd-encrypt filesystems }"
 		if [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" == "ssh" ]]; then
 			new_hooks="${new_hooks//sd-encrypt /sd-network sd-tinyssh sd-encrypt }"
 			log::info "mkinitcpio: LUKS hooks (sd-network, sd-tinyssh, sd-encrypt, dm_crypt)"
+		elif [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" == "telegram" ]]; then
+			new_hooks="${new_hooks//sd-encrypt /sd-network telegram-unlock sd-encrypt }"
+			log::info "mkinitcpio: LUKS hooks (sd-network, telegram-unlock, sd-encrypt, dm_crypt)"
 		else
 			log::info "mkinitcpio: LUKS hooks (sd-encrypt, dm_crypt) — keyboard mode"
 		fi
@@ -636,7 +642,21 @@ bootstrap::luks_initramfs() {
 	local unlock_mode="${BUILD_LUKS_UNLOCK_MODE:-keyboard}"
 
 	if [[ "$unlock_mode" == "keyboard" ]]; then
-		log::info "LUKS: keyboard mode — skipping tinyssh (no remote unlock)"
+		log::info "LUKS: keyboard mode — skipping initramfs extras"
+		return 0
+	fi
+
+	if [[ "$unlock_mode" == "telegram" ]]; then
+		log::info "Настройка LUKS Telegram unlock..."
+		mkdir -p "$target/etc/initcpio/install" "$target/etc/initcpio/hooks"
+		assets::write "initcpio/install/telegram-unlock" "$target/etc/initcpio/install/telegram-unlock"
+		chmod 0644 "$target/etc/initcpio/install/telegram-unlock"
+		assets::write "initcpio/hooks/telegram-unlock" "$target/etc/initcpio/hooks/telegram-unlock"
+		chmod 0644 "$target/etc/initcpio/hooks/telegram-unlock"
+		sed -i "s|__BOT_TOKEN__|${BUILD_TELEGRAM_BOT_TOKEN}|g" "$target/etc/initcpio/hooks/telegram-unlock"
+		sed -i "s|__CHAT_ID__|${BUILD_TELEGRAM_CHAT_ID}|g" "$target/etc/initcpio/hooks/telegram-unlock"
+		sed -i "s|__LUKS_UUID__|${LUKS_UUID}|g" "$target/etc/initcpio/hooks/telegram-unlock"
+		log::info "Telegram unlock hook installed"
 		return 0
 	fi
 

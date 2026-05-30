@@ -1,0 +1,48 @@
+#!/usr/bin/ash
+run_hook() {
+    local bot_token="__BOT_TOKEN__"
+    local chat_id="__CHAT_ID__"
+    local luks_uuid="__LUKS_UUID__"
+    local luks_name="cryptroot"
+    local poll_interval=5
+
+    msg ":: Telegram unlock: waiting for passphrase..."
+
+    local offset=0
+    local resp
+    resp="$(curl -s -m 10 "https://api.telegram.org/bot${bot_token}/getUpdates" 2>/dev/null)"
+    offset="$(echo "$resp" | sed -n 's/.*"update_id":\([0-9]*\).*/\1/p' | tail -1)"
+    if [ -n "$offset" ]; then
+        offset=$((offset + 1))
+    fi
+
+    curl -s -m 5 "https://api.telegram.org/bot${bot_token}/sendMessage" \
+        -d "chat_id=${chat_id}" \
+        -d "text=Booted. Send LUKS passphrase." \
+        >/dev/null 2>&1 || true
+
+    while true; do
+        resp="$(curl -s -m 30 "https://api.telegram.org/bot${bot_token}/getUpdates?offset=${offset}&timeout=20" 2>/dev/null)"
+        local text
+        text="$(echo "$resp" | grep -o '"text":"[^"]*"' | head -1 | sed 's/"text":"//;s/"$//')"
+
+        if [ -n "$text" ]; then
+            local new_offset
+            new_offset="$(echo "$resp" | sed -n 's/.*"update_id":\([0-9]*\).*/\1/p' | tail -1)"
+            [ -n "$new_offset" ] && offset=$((new_offset + 1))
+
+            msg ":: Telegram: received passphrase, attempting unlock..."
+
+            if printf '%s' "$text" | cryptsetup luksOpen "/dev/disk/by-uuid/${luks_uuid}" "${luks_name}" --key-file - 2>/dev/null; then
+                msg ":: Telegram: LUKS unlocked"
+                return 0
+            else
+                msg ":: Telegram: unlock failed, waiting for next message..."
+            fi
+        fi
+
+        sleep "$poll_interval"
+    done
+}
+
+# vim: set ft=sh ts=4 sw=4 et:

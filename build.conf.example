@@ -54,10 +54,14 @@ BUILD_ENABLE_FSTRIM=1
 BUILD_ENABLE_ENCRYPTION=0
 # LUKS passphrase for disk encryption (required when BUILD_ENABLE_ENCRYPTION=1)
 BUILD_LUKS_PASSWORD=""
-# LUKS unlock mode: "keyboard" (local console, default) or "ssh" (remote via tinysshd in initramfs)
+# LUKS unlock mode: "keyboard" (local console, default), "ssh" (remote via tinysshd in initramfs)
+# or "telegram" (poll Telegram Bot API for passphrase — requires BUILD_TELEGRAM_BOT_TOKEN + BUILD_TELEGRAM_CHAT_ID)
 BUILD_LUKS_UNLOCK_MODE="keyboard"
-# URL to pre-built mkinitcpio-systemd-extras AUR package (*.pkg.tar.zst)
+# URL to pre-built mkinitcpio-systemd-extras AUR package (*.pkg.tar.zst) — required for ssh mode
 BUILD_AUR_PKG_URL=""
+# Telegram Bot API credentials for LUKS unlock (required when BUILD_LUKS_UNLOCK_MODE=telegram)
+BUILD_TELEGRAM_BOT_TOKEN=""
+BUILD_TELEGRAM_CHAT_ID=""
 
 BUILD_MODULES=(
     "disk_image"

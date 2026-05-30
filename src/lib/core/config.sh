@@ -114,5 +114,15 @@ config::validate() {
 	if [[ "${BUILD_ENABLE_ENCRYPTION:-0}" == "1" ]]; then
 		[[ "${BUILD_FILESYSTEM:-ext4}" == "btrfs" ]] || log::die "BUILD_ENABLE_ENCRYPTION requires BUILD_FILESYSTEM=btrfs"
 		[[ -n "${BUILD_LUKS_PASSWORD:-}" ]] || log::die "BUILD_LUKS_PASSWORD is required when BUILD_ENABLE_ENCRYPTION=1"
+		if [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" == "telegram" ]]; then
+			[[ -n "${BUILD_TELEGRAM_BOT_TOKEN:-}" ]] || log::die "BUILD_TELEGRAM_BOT_TOKEN is required for telegram unlock mode"
+			[[ -n "${BUILD_TELEGRAM_CHAT_ID:-}" ]] || log::die "BUILD_TELEGRAM_CHAT_ID is required for telegram unlock mode"
+			BUILD_PACKAGES+=("curl")
+		fi
+		if [[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" != "keyboard" ]] &&
+			[[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" != "ssh" ]] &&
+			[[ "${BUILD_LUKS_UNLOCK_MODE:-keyboard}" != "telegram" ]]; then
+			log::die "BUILD_LUKS_UNLOCK_MODE must be 'keyboard', 'ssh', or 'telegram', got: '$BUILD_LUKS_UNLOCK_MODE'"
+		fi
 	fi
 }
