@@ -7,6 +7,7 @@ Wants=systemd-homed.service
 Type=oneshot
 ExecStart=/usr/local/lib/rpi5-archlinux/firstboot.sh
 RemainAfterExit=yes
+TimeoutStartSec=600
 
 [Install]
 WantedBy=multi-user.target

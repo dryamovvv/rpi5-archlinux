@@ -15,11 +15,17 @@ for i in $(seq 1 15); do
 	sleep 1
 done
 
+if ! systemctl is-active systemd-homed.service >/dev/null 2>&1; then
+	log "systemd-homed still not active after 15s, starting explicitly"
+	systemctl start systemd-homed.service 2>/dev/null || true
+	sleep 3
+fi
+
 if ! id -u "$USER_NAME" >/dev/null 2>&1; then
 	CREATED=0
 	if [[ -f "$IDENTITY_FILE" ]]; then
 		log "identity file found, trying homectl create..."
-		if homectl create --identity="$IDENTITY_FILE" --storage=directory; then
+		if homectl create --identity="$IDENTITY_FILE" --storage=subvolume; then
 			log "user $USER_NAME created via homectl create"
 			CREATED=1
 		else
@@ -81,8 +87,13 @@ if [[ -n "$SWAPFILE_SIZE" ]] && command -v btrfs >/dev/null 2>&1 &&
 		mkdir -p /swap
 		mount -t btrfs -o subvol=@swap,noatime,nodatacow "$(findmnt -n -o SOURCE /)" /swap 2>/dev/null || true
 	fi
-	btrfs filesystem mkswapfile --size "$SWAPFILE_SIZE" --uuid clear /swap/swapfile
-	grep -q "/swap/swapfile" /etc/fstab 2>/dev/null ||
-		echo "/swap/swapfile none swap defaults,pri=1 0 0" >>/etc/fstab
-	swapon --fixpgsz /swap/swapfile
+	if mountpoint -q /swap 2>/dev/null; then
+		log "creating ${SWAPFILE_SIZE} swapfile (runs in background)..."
+		(
+			btrfs filesystem mkswapfile --size "$SWAPFILE_SIZE" --uuid clear /swap/swapfile
+			grep -q "/swap/swapfile" /etc/fstab 2>/dev/null ||
+				echo "/swap/swapfile none swap defaults,pri=1 0 0" >>/etc/fstab
+			swapon --fixpgsz /swap/swapfile 2>/dev/null || true
+		) &
+	fi
 fi
