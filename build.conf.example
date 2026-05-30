@@ -46,6 +46,9 @@ BUILD_SWAPFILE_SIZE="16G"
 BUILD_ENABLE_WIFI=0
 # Firewall (nftables): 1=enabled (default), 0=disabled — SSH+80+443+estab+lo, rest denied
 BUILD_ENABLE_FIREWALL=1
+# Periodic TRIM for NVMe/SSD (fstrim.timer): 1=enabled (default), 0=disabled
+# BTRFS discard=async is kernel default since 6.2 — fstrim is complementary, not replacement
+BUILD_ENABLE_FSTRIM=1
 # Disk encryption via LUKS (btrfs only): 1=enabled, 0=disabled (default)
 # WARNING: requires pre-built mkinitcpio-systemd-extras AUR package at BUILD_AUR_PKG_URL
 BUILD_ENABLE_ENCRYPTION=0
